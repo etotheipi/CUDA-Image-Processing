@@ -166,6 +166,8 @@ void runMorphologyUnitTests()
    dim3 BLOCK( bx, by, 1);
    dim3 GRID(  gx, gy, 1);
 
+   /////////////////////////////////////////////////////////////////////////////
+   // TEST THE GENERIC/UNIVERSAL MORPHOLOGY OPS
    // Non-zero elts = 134, so use -133 for dilate
    Morph_Generic_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH, 
                                                 devPsf, se17H/2, se17W/2, -133);
@@ -180,6 +182,22 @@ void runMorphologyUnitTests()
    cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
    WriteFile("ImageErode.txt", imgOut, imgW, imgH);
 
+   /////////////////////////////////////////////////////////////////////////////
+   // We also need to verify that the 3x3 optimized functions work
+   Morph3x3_Dilate_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH);
+   cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
+   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
+   WriteFile("Image3x3_dilate.txt", imgOut, imgW, imgH);
+
+   Morph3x3_Erode4connect_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH);
+   cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
+   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
+   WriteFile("Image3x3_erode.txt", imgOut, imgW, imgH);
+
+   Morph3x3_Thin8_Kernel<<<GRID,BLOCK>>>(devOut, devIn, imgW, imgH);
+   cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
+   cudaMemcpy(imgIn, devIn, imgBytes, cudaMemcpyDeviceToHost);
+   WriteFile("Image3x3_erode_thin.txt", imgIn, imgW, imgH);
 
    free(imgIn);
    free(imgOut);

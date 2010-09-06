@@ -112,3 +112,109 @@ __global__ void  Morph_Generic_Kernel(
 
    devOutPtr[globalIdx] = (shmOutput[localIdx] + 1) / 2;
 }
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Standard 3x3 erosions, dilations and median filtering
+
+// Standard (8-connected) 3x3 morph operations
+CREATE_3X3_MORPH_KERNEL( Dilate,      -8,  
+                                             1,  1,  1,
+                                             1,  1,  1,
+                                             1,  1,  1);
+CREATE_3X3_MORPH_KERNEL( Erode,        9,
+                                             1,  1,  1,
+                                             1,  1,  1,
+                                             1,  1,  1);
+CREATE_3X3_MORPH_KERNEL( Median,       0,
+                                             1,  1,  1,
+                                             1,  1,  1,
+                                             1,  1,  1);
+// 4-connected (cross-shaped) structuring elements
+CREATE_3X3_MORPH_KERNEL( Dilate4connect, -4,  
+                                             0,  1,  0,
+                                             1,  1,  1,
+                                             0,  1,  0);
+CREATE_3X3_MORPH_KERNEL( Erode4connect,   5,
+                                             0,  1,  0,
+                                             1,  1,  1,
+                                             0,  1,  0);
+CREATE_3X3_MORPH_KERNEL( Median4connect,  0,
+                                             0,  1,  0,
+                                             1,  1,  1,
+                                             0,  1,  0);
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// There are 8 standard structuring elements for THINNING
+CREATE_3X3_MORPH_KERNEL( Thin1,         7,
+                                             1,  1,  1,
+                                             0,  1,  0,
+                                            -1, -1, -1);
+CREATE_3X3_MORPH_KERNEL( Thin2,         7,
+                                            -1,  0,  1,
+                                            -1,  1,  1,
+                                            -1,  0,  1);
+CREATE_3X3_MORPH_KERNEL( Thin3,         7,
+                                            -1, -1, -1,
+                                             0,  1,  0,
+                                             1,  1,  1);
+CREATE_3X3_MORPH_KERNEL( Thin4,         7,
+                                             1,  0, -1,
+                                             1,  1, -1,
+                                             1,  0, -1);
+
+CREATE_3X3_MORPH_KERNEL( Thin5,         6,
+                                             0, -1, -1,
+                                             1,  1, -1,
+                                             0,  1,  0);
+CREATE_3X3_MORPH_KERNEL( Thin6,         6,
+                                             0,  1,  0,
+                                             1,  1, -1,
+                                             0, -1, -1);
+CREATE_3X3_MORPH_KERNEL( Thin7,         6,
+                                             0,  1,  0,
+                                            -1,  1,  1,
+                                            -1, -1,  0);
+CREATE_3X3_MORPH_KERNEL( Thin8,         6,
+                                            -1, -1,  0,
+                                            -1,  1,  1,
+                                             0,  1,  0);
+        
+////////////////////////////////////////////////////////////////////////////////
+// There are 8 standard structuring elements for PRUNING
+CREATE_3X3_MORPH_KERNEL( Prune1,         7,
+                                             0,  1,  0,
+                                            -1,  1, -1,
+                                            -1, -1, -1);
+CREATE_3X3_MORPH_KERNEL( Prune2,         7,
+                                            -1, -1,  0,
+                                            -1,  1,  1,
+                                            -1, -1,  0);
+CREATE_3X3_MORPH_KERNEL( Prune3,         7,
+                                            -1, -1, -1,
+                                            -1,  1, -1,
+                                             0,  1,  0);
+CREATE_3X3_MORPH_KERNEL( Prune4,         7,
+                                             0, -1, -1,
+                                             1,  1, -1,
+                                             0, -1, -1);
+
+CREATE_3X3_MORPH_KERNEL( Prune5,         9,
+                                            -1, -1, -1,
+                                            -1,  1, -1,
+                                             1, -1, -1);
+CREATE_3X3_MORPH_KERNEL( Prune6,         9,
+                                            -1, -1, -1,
+                                            -1,  1, -1,
+                                            -1, -1,  1);
+CREATE_3X3_MORPH_KERNEL( Prune7,         9,
+                                            -1, -1,  1,
+                                            -1,  1, -1,
+                                            -1, -1, -1);
+CREATE_3X3_MORPH_KERNEL( Prune8,         9,
+                                             1, -1, -1,
+                                            -1,  1, -1,
+                                            -1, -1, -1);
+

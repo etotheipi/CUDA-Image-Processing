@@ -71,10 +71,7 @@ using namespace std;
          int glCol = cornerCol + prCol - psfColRad;   \
          int glRow = cornerRow + prRow - psfRowRad;   \
          int glIdx = IDX_1D(glCol, glRow, imgRows);   \
-         if(glRow >= 0        &&  \
-            glRow <  imgRows  &&  \
-            glCol >= 0        &&  \
-            glCol <  imgCols)   \
+         if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
             shmPadRect[prIndex] = devInPtr[glIdx];   \
          else   \
             shmPadRect[prIndex] = 0; \
@@ -104,10 +101,7 @@ using namespace std;
          int glCol = cornerCol + prCol - psfColRad;   \
          int glRow = cornerRow + prRow - psfRowRad;   \
          int glIdx = IDX_1D(glCol, glRow, imgRows);   \
-         if(glRow >= 0        &&  \
-            glRow <  imgRows  &&  \
-            glCol >= 0        &&  \
-            glCol <  imgCols)   \
+         if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
             shmPadRect[prIndex] = devInPtr[glIdx]*2 - 1;   \
          else   \
             shmPadRect[prIndex] = -1; \
@@ -172,63 +166,117 @@ __global__ void  Morph3x3_##name##_Kernel(       \
                int*   devOutPtr,          \
                int    imgCols,          \
                int    imgRows)  \
-{        \
+{ \
    const int cornerCol = blockDim.x*blockIdx.x;   \
    const int cornerRow = blockDim.y*blockIdx.y;   \
    const int globalCol = cornerCol + threadIdx.x;   \
    const int globalRow = cornerRow + threadIdx.y;   \
    const int globalIdx = IDX_1D(globalCol, globalRow, imgRows);   \
 \
-\
    const int localCol    = threadIdx.x;   \
    const int localRow    = threadIdx.y;   \
    const int localIdx    = IDX_1D(localCol, localRow, blockDim.y);   \
-   const int localPixels = blockDim.x * blockDim.y; \
+   const int localPixels = blockDim.x*blockDim.y;   \
 \
    const int padRectStride = blockDim.y + 2; \
    const int padRectCol    = localCol + 1;   \
    const int padRectRow    = localRow + 1;   \
 \
-   __shared__ int sharedMem[8192];   \
+   __shared__ int sharedMem[SHMEM];   \
    int* shmPadRect  = (int*)sharedMem;   \
-   int* shmOutput   = (int*)&shmPadRect[352];   \
+   int* shmOutput   = (int*)&shmPadRect[512];   \
 \
    shmOutput[localIdx] = -1;\
 \
-   for(int nLoop=0; nLoop<2; nLoop++) \
-   { \
-      int prIdx = i*localPixels + localIdx; \
-      int prCol = COL_2D(prIdx, padRectStride);   \
-      int prRow = ROW_2D(prIdx, padRectStride);   \
-      int glCol = cornerCol + prCol - 1;   \
-      int glRow = cornerRow + prRow - 1;   \
-      int glIdx = IDX_1D(glCol, glRow, imgRows);   \
-      if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
-         shmPadRect[prIdx] = devInPtr[glIdx]*2 - 1;   \
-      else   \
-         shmPadRect[prIdx] = -1; \
-   } \
+   int prIdx, prCol, prRow, glCol, glRow, glIdx; \
+\
+   prIdx = localIdx;   \
+   prCol = COL_2D(prIdx, padRectStride);   \
+   prRow = ROW_2D(prIdx, padRectStride);   \
+   glCol = cornerCol + prCol - 1;   \
+   glRow = cornerRow + prRow - 1;   \
+   glIdx = IDX_1D(glCol, glRow, imgRows);   \
+   if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
+      shmPadRect[prIdx] = devInPtr[glIdx]*2 - 1;   \
+   else   \
+      shmPadRect[prIdx] = -1; \
+\
+   prIdx = localPixels + localIdx;   \
+   prCol = COL_2D(prIdx, padRectStride);   \
+   prRow = ROW_2D(prIdx, padRectStride);   \
+   glCol = cornerCol + prCol - 1;   \
+   glRow = cornerRow + prRow - 1;   \
+   glIdx = IDX_1D(glCol, glRow, imgRows);   \
+   if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
+      shmPadRect[prIdx] = devInPtr[glIdx]*2 - 1;   \
+   else   \
+      shmPadRect[prIdx] = -1; \
 \
    __syncthreads();   \
 \
-   int accum = 0;\
+   int accum = 0;  \
+   int coff, roff, seVal, shmPRCol, shmPRRow, shmPRIdx; \
 \
-   accum += a00 * shmPadRect[IDX_1D(padRectCol-1, padRectRow-1, padRectStride)];  \
-   accum += a01 * shmPadRect[IDX_1D(padRectCol-1, padRectRow  , padRectStride)];  \
-   accum += a02 * shmPadRect[IDX_1D(padRectCol-1, padRectRow+1, padRectStride)];  \
-   accum += a10 * shmPadRect[IDX_1D(padRectCol  , padRectRow-1, padRectStride)];  \
-   accum += a11 * shmPadRect[IDX_1D(padRectCol  , padRectRow  , padRectStride)];  \
-   accum += a12 * shmPadRect[IDX_1D(padRectCol  , padRectRow+1, padRectStride)];  \
-   accum += a20 * shmPadRect[IDX_1D(padRectCol+1, padRectRow-1, padRectStride)];  \
-   accum += a21 * shmPadRect[IDX_1D(padRectCol+1, padRectRow  , padRectStride)];  \
-   accum += a22 * shmPadRect[IDX_1D(padRectCol+1, padRectRow+1, padRectStride)];  \
+   coff=-1; roff=-1; seVal = a00; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
 \
-   if(accum >= seTargSum) \
-      shmOutput[localIdx] = 1; \
+   coff=-1; roff=0; seVal = a01; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
 \
-   __syncthreads();   \
+   coff=-1; roff=1; seVal = a02; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
 \
-   devOutPtr[globalIdx] = (shmOutput[localIdx] + 1) / 2; \
+   coff=0; roff=-1; seVal = a10; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
+\
+   coff=0; roff=0; seVal = a11; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
+\
+   coff=0; roff=1; seVal = a12; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
+\
+   coff=1; roff=-1; seVal = a20; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
+\
+   coff=1; roff=0; seVal = a21; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
+\
+   coff=1; roff=1; seVal = a22; \
+   shmPRCol = padRectCol + coff;     \
+   shmPRRow = padRectRow + roff;     \
+   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   accum += seVal * shmPadRect[shmPRIdx];  \
+\
+   if(accum >= seTargSum)  \
+      shmOutput[localIdx] = 1;  \
+  \
+   __syncthreads();     \
+  \
+   devOutPtr[globalIdx] = (shmOutput[localIdx] + 1) / 2;  \
 }
 
 

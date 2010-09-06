@@ -49,6 +49,7 @@
 //          the median is 1 if and only if there are more +1s than -1s.
 //          Therefore, our target should be [0] or greater
 //
+//
 // THEREFORE, consider the following structuring elt with 6 non-zero pixels:
 // 
 //         se =      0  1  0
@@ -70,5 +71,36 @@ __global__ void  Morph_Generic_Kernel(
                int   seColRad,
                int   seRowRad,
                int   seTargSum);
+
+////////////////////////////////////////////////////////////////////////////////
+// Standard 3x3 erosions, dilations and median filtering
+DECLARE_3X3_MORPH_KERNEL( Dilate )
+DECLARE_3X3_MORPH_KERNEL( Erode )
+DECLARE_3X3_MORPH_KERNEL( Median )
+DECLARE_3X3_MORPH_KERNEL( Dilate4connect )
+DECLARE_3X3_MORPH_KERNEL( Erode4connect )
+DECLARE_3X3_MORPH_KERNEL( Median4connect )
+
+////////////////////////////////////////////////////////////////////////////////
+// There are 8 standard structuring elements for THINNING
+DECLARE_3X3_MORPH_KERNEL( Thin1 );
+DECLARE_3X3_MORPH_KERNEL( Thin2 );
+DECLARE_3X3_MORPH_KERNEL( Thin3 );
+DECLARE_3X3_MORPH_KERNEL( Thin4 );
+DECLARE_3X3_MORPH_KERNEL( Thin5 );
+DECLARE_3X3_MORPH_KERNEL( Thin6 );
+DECLARE_3X3_MORPH_KERNEL( Thin7 );
+DECLARE_3X3_MORPH_KERNEL( Thin8 );
+        
+////////////////////////////////////////////////////////////////////////////////
+// There are 8 standard structuring elements for PRUNING
+DECLARE_3X3_MORPH_KERNEL( Prune1 );
+DECLARE_3X3_MORPH_KERNEL( Prune2 );
+DECLARE_3X3_MORPH_KERNEL( Prune3 );
+DECLARE_3X3_MORPH_KERNEL( Prune4 );
+DECLARE_3X3_MORPH_KERNEL( Prune5 );
+DECLARE_3X3_MORPH_KERNEL( Prune6 );
+DECLARE_3X3_MORPH_KERNEL( Prune7 );
+DECLARE_3X3_MORPH_KERNEL( Prune8 );
 
 #endif
