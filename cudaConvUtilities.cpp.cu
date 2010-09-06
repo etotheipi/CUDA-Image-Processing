@@ -207,6 +207,7 @@ void PrintArray(int* srcPtr, int nCols, int nRows)
    // We work with col-row format, but files written in row-col, so switch loop
    for(int r=0; r<nRows; r++)
    {
+      cout << "\t";
       for(int c=0; c<nCols; c++)
       {
          cout << srcPtr[c*nRows+r] << " ";

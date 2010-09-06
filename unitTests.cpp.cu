@@ -98,7 +98,7 @@ int main( int argc, char** argv)
    }
 
    /////////////////////////////////////////////////////////////////////////////
-   //runMorphologyUnitTests();
+   runMorphologyUnitTests();
 
    /////////////////////////////////////////////////////////////////////////////
    cudaThreadExit();
@@ -130,6 +130,15 @@ void runMorphologyUnitTests()
    printf("\nTesting morphology operations on %dx%d mask.\n", imgW,imgH);
    cout << "Reading mask from " << fn.c_str() << endl;
    ReadFile(fn, imgIn, imgW, imgH);
+   WriteFile("ImageIn.txt", imgIn, imgW, imgH);
+
+   // A very unique 17x17 to test coord systems
+   int  se17W = 17;
+   int  se17H = 17;
+   int  se17Pixels = se17W*se17H;
+   int  se17Bytes = se17Pixels * INT_SZ;
+   int* se17 = (int*)malloc(se17Bytes);
+   ReadFile("asymmPSF_17x17.txt",   se17,  se17W,  se17H);
 
    // Also test a circle
    int  seCircD = 5; // D~Diameter
@@ -138,33 +147,47 @@ void runMorphologyUnitTests()
    int* seCirc = (int*)malloc(seCircBytes);
    int  seCircNZ = createBinaryCircle(seCirc, seCircD); // return #non-zero
 
-   PrintArray(seCirc, 5, 5);
+   cout << "Using the following structuring element: " << endl;
+   PrintArray(se17, 17, 17);
 
    int* devIn;
    int* devOut;
    int* devPsf;
    cudaMalloc((void**)&devIn,  imgBytes);
    cudaMalloc((void**)&devOut, imgBytes);
-   cudaMalloc((void**)&devPsf, seCircBytes);
+   cudaMalloc((void**)&devPsf, se17Bytes);
    cudaMemcpy(devIn,  imgIn,  imgBytes,    cudaMemcpyHostToDevice);
-   cudaMemcpy(devPsf, seCirc, seCircBytes, cudaMemcpyHostToDevice);
+   cudaMemcpy(devPsf, se17, se17Bytes, cudaMemcpyHostToDevice);
 
-   dim3 GRID(  32,  8, 1);
-   dim3 BLOCK(  8, 32, 1);
-   //Morph3x3_Dilate_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH);
+   int bx = 8;
+   int by = 32;
+   int gx = imgW/bx;
+   int gy = imgH/by;
+   dim3 BLOCK( bx, by, 1);
+   dim3 GRID(  gx, gy, 1);
+
+   // Non-zero elts = 134, so use -133 for dilate
+   Morph_Generic_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH, 
+                                                devPsf, se17H/2, se17W/2, -133);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
    cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
-   
-   WriteFile("ImageIn.txt", imgIn, imgW, imgH);
-   WriteFile("ImageOut.txt", imgOut, imgW, imgH);
+   WriteFile("ImageDilate.txt", imgOut, imgW, imgH);
 
+   // Non-zero elts = 134, so use 134 for erod
+   Morph_Generic_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH, 
+                                                devPsf, se17H/2, se17W/2, 134);
+   cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
+   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
+   WriteFile("ImageErode.txt", imgOut, imgW, imgH);
 
 
    free(imgIn);
    free(imgOut);
-   //free(se17);
-   //free(seRect);
    free(seCirc);
+   free(se17);
+   cudaFree(devIn);
+   cudaFree(devOut);
+   cudaFree(devPsf);
    /////////////////////////////////////////////////////////////////////////////
 }
 

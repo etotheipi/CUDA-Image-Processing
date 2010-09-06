@@ -49,6 +49,15 @@
 //          the median is 1 if and only if there are more +1s than -1s.
 //          Therefore, our target should be [0] or greater
 //
+// THEREFORE, consider the following structuring elt with 6 non-zero pixels:
+// 
+//         se =      0  1  0
+//                   1  1  1
+//                   1  1  0
+//
+//  Morph_Generic_Kernel(se, targSum =  6) ~  Erode
+//  Morph_Generic_Kernel(se, targSum = -5) ~  Dilate
+//  Morph_Generic_Kernel(se, targSum =  0) ~  Median
 //
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
