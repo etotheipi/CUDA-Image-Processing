@@ -1,0 +1,6 @@
+*.swp
+bin/*
+common/obj/*
+common/shared/obj/*
+obj/*
+
