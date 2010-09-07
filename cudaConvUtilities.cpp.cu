@@ -7,8 +7,9 @@ using namespace std;
 #include "cudaConvUtilities.h.cu"
 using namespace std;
 
-unsigned int cpuTimer;
-unsigned int gpuTimer;
+unsigned int cpuTimerVariable;
+cudaEvent_t eventTimerStart;
+cudaEvent_t eventTimerStop;
 
 // Assume target memory has already been allocated, nPixels is odd
 void createGaussian1D(float* targPtr, 
@@ -155,21 +156,42 @@ int createBinaryCircle(int*   targPtr,
 void cpuStartTimer(void)
 {
    // GPU Timer Functions
-   cpuTimer = 0;
-   cutilCheckError( cutCreateTimer( &cpuTimer));
-   cutilCheckError( cutStartTimer( cpuTimer));
+   cpuTimerVariable = 0;
+   cutCreateTimer( &cpuTimerVariable );
+   cutStartTimer(   cpuTimerVariable );
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Stopping also resets the timer
+// returns milliseconds
 float cpuStopTimer(void)
 {
-   cutilCheckError( cutStopTimer( cpuTimer));
-   float cpuTime = cutGetTimerValue(cpuTimer);
-   cutilCheckError( cutDeleteTimer( cpuTimer));
+   cutStopTimer( cpuTimerVariable );
+   float cpuTime = cutGetTimerValue(cpuTimerVariable);
+   cutDeleteTimer( cpuTimerVariable );
    return cpuTime;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// Timing Calls for GPU -- this only counts GPU clock cycles, which will be 
+// more precise for measuring GFLOPS and xfer rates, but shorter than wall time
+void gpuStartTimer(void)
+{
+   cudaEventCreate(&eventTimerStart);
+   cudaEventCreate(&eventTimerStop);
+   cudaEventRecord(eventTimerStart);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Stopping also resets the timer
+float gpuStopTimer(void)
+{
+   cudaEventRecord(eventTimerStop);
+   cudaEventSynchronize(eventTimerStop);
+   float gpuTime;
+   cudaEventElapsedTime(&gpuTime, eventTimerStart, eventTimerStop);
+   return gpuTime;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Read/Write images from/to files
@@ -238,3 +260,73 @@ void prepareCudaTexture(float* h_src,
    cutilSafeCall( cudaMemcpy3D(&copyParams) );
 }
 ////////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////////////////////////////////////
+// BASIC UNARY & BINARY *MASK* OPERATORS
+// 
+// Could create LUTs, but I'm not sure the extra implementation complexity
+// actually provides much benefit.  These ops already run on the order of
+// microseconds.
+//
+// NOTE:  These operators are for images with {0,1}, only the MORPHOLOGICAL
+//        operators will operate with {-1,0,1}
+//
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+__global__ void  MaskUnion_Kernel( int* A, int* B, int* devOut)
+{  
+   const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+
+   if( A[idx] + B[idx] > 0)
+      devOut[idx] = 1;
+   else
+      devOut[idx] = 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+__global__ void  MaskIntersect_Kernel( int* A, int* B, int* devOut)
+{  
+   const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+   devOut[idx] = A[idx] * B[idx];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// (A - B):   A is set to 0 if B is 1, otherwise A is left alone
+__global__ void  MaskSubtract_Kernel( int* A, int* B, int* devOut)
+{  
+   const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+   if( B[idx] == 0)
+      devOut[idx] = 0;
+   else 
+      devOut[idx] = A[idx];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+__global__ void  MaskInvert_Kernel( int* A, int* devOut)
+{  
+   const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+   devOut[idx] = 1 - A[idx];
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// TODO: This is a very dumb/slow equal operator, actually won't even work
+//       Perhaps have the threads atomicAdd to a globalMem location if !=
+//__global__ void  MaskCountDiff_Kernel( int* A, int* B, int* globalMemCount)
+//{  
+   //const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+   //if(A[idx] != B[idx])
+      //atomicAdd(numNotEqual, 1);
+//}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// TODO: Need to use reduction for this, but that can be kind of complicated
+//__global__ void  MaskSum_Kernel( int* A, int* globalMemSum)
+//{  
+   //const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+   //if(A[idx] != B[idx])
+      //atomicAdd(numNotEqual, 1);
+//}

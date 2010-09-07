@@ -343,4 +343,26 @@ int createBinaryCircle(int*   targPtr,
                        int    diameter);
 
 
+
+
+////////////////////////////////////////////////////////////////////////////////
+// BASIC UNARY & BINARY *MASK* OPERATORS
+// 
+// Could create LUTs, but I'm not sure the extra implementation complexity
+// actually provides much benefit.  These ops already run on the order of
+// microseconds.
+//
+// NOTE:  These operators are for images with {0,1}, only the MORPHOLOGICAL
+//        operators will operate with {-1,0,1}
+//
+////////////////////////////////////////////////////////////////////////////////
+__global__ void  MaskUnion_Kernel( int* A, int* B, int* devOut);
+__global__ void  MaskIntersect_Kernel( int* A, int* B, int* devOut);
+__global__ void  MaskSubtract_Kernel( int* A, int* B, int* devOut);
+__global__ void  MaskInvert_Kernel( int* A, int* devOut);
+__global__ void  MaskCopy_Kernel( int* A, int* devOut);
+__global__ void  MaskCountDiff_Kernel( int* A, int* B, int* globalMemCount);
+__global__ void  MaskSum_Kernel( int* A, int* globalMemSum);
+
+
 #endif

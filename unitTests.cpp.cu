@@ -32,6 +32,8 @@
 #include <stopwatch.h>
 #include <cmath>
 
+#include "cudaImageHost.h"
+#include "cudaImageDevice.h.cu"
 #include "cudaConvUtilities.h.cu"
 #include "cudaConvolution.h.cu"
 #include "cudaMorphology.h.cu"
@@ -41,6 +43,8 @@ using namespace std;
 
 unsigned int timer;
 
+int  runDevicePropertiesQuery(void);
+void runCudaImageUnitTests(void);
 void runConvolutionUnitTests(void);
 void runMorphologyUnitTests(void);
 void runWorkbenchUnitTests(void);
@@ -55,11 +59,26 @@ void runWorkbenchUnitTests(void);
 ////////////////////////////////////////////////////////////////////////////////
 int main( int argc, char** argv) 
 {
+   runDevicePropertiesQuery();
 
-   cout << endl << "Executing GPU-accelerated convolution..." << endl;
+   // This spits out a lot of data, but it is informative so I prefer to keep
+   // it here.  Comment it out if desired.
+   runCudaImageUnitTests();
 
-   /////////////////////////////////////////////////////////////////////////////
-   // Query the devices on the system and select the fastest
+   runMorphologyUnitTests();
+
+   cudaThreadExit();
+}
+
+/////////////////////////////////////////////////////////////////////////////
+// Query the devices on the system and select the fastest (or override the
+// selectedDevice variable to choose your own
+int runDevicePropertiesQuery(void)
+{
+   cout << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << "***Device query and selection:" << endl;
    int deviceCount = 0;
 	if (cudaGetDeviceCount(&deviceCount) != cudaSuccess)
    {
@@ -71,14 +90,14 @@ int main( int argc, char** argv)
    // Check to make sure we have at least on CUDA-capable device
    if( deviceCount == 0)
    {
-      cout << "No CUDA devices available.  Exiting." << endl;
+      cout << "No CUDA devices available." << endl;
       return -1;
 	}
 
    // Fastest device automatically selected.  Can override below
-   int fastestDeviceID = cutGetMaxGflopsDeviceId() ;
-   //fastestDeviceID = 0;
-   cudaSetDevice(fastestDeviceID);
+   int selectedDevice = cutGetMaxGflopsDeviceId() ;
+   //selectedDevice = 0;
+   cudaSetDevice(selectedDevice);
 
    cudaDeviceProp gpuProp;
    cout << "CUDA-enabled devices on this system:  " << deviceCount <<  endl;
@@ -89,7 +108,7 @@ int main( int argc, char** argv)
       int mjr = gpuProp.major;
       int mnr = gpuProp.minor;
       int memMB = gpuProp.totalGlobalMem / (1024*1024);
-      if( dev==fastestDeviceID )
+      if( dev==selectedDevice )
          cout << "\t* ";
       else
          cout << "\t  ";
@@ -97,15 +116,104 @@ int main( int argc, char** argv)
       printf("(%d) %20s (%d MB): \tCUDA Capability %d.%d \n", dev, devName, memMB, mjr, mnr);
    }
 
-   /////////////////////////////////////////////////////////////////////////////
-   runMorphologyUnitTests();
-
-   /////////////////////////////////////////////////////////////////////////////
-   cudaThreadExit();
-
-   //cutilExit(argc, argv);
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   return selectedDevice;
 }
 
+void runCudaImageUnitTests(void)
+{
+   cout << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << "***Test CudaImage classes and GPU allocation/copy speeds" << endl;
+
+   // Allocate some memory the "old" way
+   int  d = 5; // D~Diameter
+   int  testPixels = d*d;
+   int  testBytes = testPixels*INT_SZ;
+   int* test = (int*)malloc(testBytes);
+   for(int i=0; i<testPixels; i++)
+      test[i] = i;
+
+   cudaImageHost h_img(test, d, d);
+   cudaImageHost h_img1(test, d, d);
+   free(test);
+
+
+   printf("\t%-50s", "Testing ImageHost basic constructor");
+   printf("Passed?  %d \n", (int)(h_img1==h_img));
+
+   printf("\t%-50s", "Testing ImageHost file I/O");
+   h_img1.writeFile("test5x5.txt");
+   h_img1.readFile("test5x5.txt", 5, 5);
+   printf("Passed?  %d \n", (int)(h_img1==h_img));
+
+   printf("\t%-50s", "Testing ImageHost copy constructor");
+   cudaImageHost h_img2(h_img1);
+   printf("Passed?  %d \n", (int)(h_img2==h_img));
+
+   printf("\t%-50s", "Testing ImageHost operator=()");
+   cudaImageHost h_img3 = h_img2;
+   printf("Passed?  %d \n", (int)(h_img3==h_img));
+
+   printf("\t%-50s", "Testing ImageHost op= with diff img sizes");
+   h_img3 = cudaImageHost(6,6);
+   h_img3 = h_img2;
+   printf("Passed?  %d \n", (int)(h_img3==h_img));
+
+   printf("\t%-50s","Testing ImageDevice constructor and sendToHost");
+   cudaImageDevice d_img1(h_img3);
+   cudaImageHost h_img4(d, d);
+   d_img1.sendToHost(h_img4);
+   printf("Passed?  %d \n", (int)(h_img4==h_img));
+   
+   printf("\t%-50s","Testing ImageDevice copyFromHost and sendToHost");
+   cudaImageDevice d_img2;
+   d_img2.copyFromHost(h_img4);
+   cudaImageHost h_img5(d,d);
+   d_img2.sendToHost(h_img5);
+   printf("Passed?  %d \n", (int)(h_img5==h_img));
+
+   printf("\t%-50s","Testing ImageDevice another constructor");
+   cudaImageDevice d_img3(d, d);
+   d_img3.copyFromHost(h_img3);
+   d_img3.sendToHost(h_img5);
+   printf("Passed?  %d \n", (int)(h_img5==h_img));
+
+   printf("\t%-50s","Testing ImageDevice one more constructor");
+   cudaImageDevice d_img4(d+1, d+1);
+   d_img4.copyFromHost(h_img3);
+   d_img4.sendToHost(h_img5);
+   printf("Passed?  %d \n", (int)(h_img5==h_img));
+
+   cout << endl << endl;
+
+   float gputime;
+
+   cout << "\tNow allocate a 4096x4096 image and move it around:" << endl;
+   gpuStartTimer();
+   cudaImageDevice deviceBigImg(4096,4096);
+   gputime = gpuStopTimer();
+   printf("\t\tAllocating 64MB in device memory took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
+
+   cudaImageHost hostBigImg(4096,4096);
+   gpuStartTimer();
+   deviceBigImg.copyFromHost(hostBigImg);
+   gputime = gpuStopTimer();
+   printf("\t\tCopying 64MB from HOST to DEVICE took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
+
+   gpuStartTimer();
+   deviceBigImg.sendToHost(hostBigImg);
+   gputime = gpuStopTimer();
+   printf("\t\tCopying 64MB from DEVICE to HOST took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
+
+   cout << "\tCheck current device memory usage:" << endl;
+   cudaImageDevice::calculateDeviceMemoryUsage(true);
+
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+}
 
 void runConvolutionUnitTests(void)
 {
@@ -115,99 +223,94 @@ void runConvolutionUnitTests(void)
 ////////////////////////////////////////////////////////////////////////////////
 void runMorphologyUnitTests()
 {
+
+   cout << endl << "Executing morphology unit tests..." << endl;
+
    /////////////////////////////////////////////////////////////////////////////
    // Allocate host memory and read in the test image from file
    /////////////////////////////////////////////////////////////////////////////
    unsigned int imgW  = 256;
    unsigned int imgH  = 256;
-   unsigned int nPix  = imgH*imgW;
-   unsigned int imgBytes = nPix*INT_SZ;
-   int* imgIn  = (int*)malloc(imgBytes);
-   int* imgOut = (int*)malloc(imgBytes);
+   unsigned int nPix  = imgW*imgH;
    string fn("salt256.txt");
 
-   cout << endl;
    printf("\nTesting morphology operations on %dx%d mask.\n", imgW,imgH);
-   cout << "Reading mask from " << fn.c_str() << endl;
-   ReadFile(fn, imgIn, imgW, imgH);
-   WriteFile("ImageIn.txt", imgIn, imgW, imgH);
+   cout << "Reading mask from " << fn.c_str() << endl << endl;
 
-   // A very unique 17x17 to test coord systems
-   int  se17W = 17;
-   int  se17H = 17;
-   int  se17Pixels = se17W*se17H;
-   int  se17Bytes = se17Pixels * INT_SZ;
-   int* se17 = (int*)malloc(se17Bytes);
-   ReadFile("asymmPSF_17x17.txt",   se17,  se17W,  se17H);
+   cudaImageHost imgIn(fn, imgW, imgH);
+   cudaImageHost imgOut(imgW, imgH);
 
-   // Also test a circle
-   int  seCircD = 5; // D~Diameter
-   int  seCircPixels = seCircD*seCircD;
-   int  seCircBytes = seCircPixels*INT_SZ;
-   int* seCirc = (int*)malloc(seCircBytes);
-   int  seCircNZ = createBinaryCircle(seCirc, seCircD); // return #non-zero
+   imgIn.writeFile("ImageIn.txt");
 
-   cout << "Using the following structuring element: " << endl;
-   PrintArray(se17, 17, 17);
 
-   int* devIn;
-   int* devOut;
-   int* devPsf;
-   cudaMalloc((void**)&devIn,  imgBytes);
-   cudaMalloc((void**)&devOut, imgBytes);
-   cudaMalloc((void**)&devPsf, se17Bytes);
-   cudaMemcpy(devIn,  imgIn,  imgBytes,    cudaMemcpyHostToDevice);
-   cudaMemcpy(devPsf, se17, se17Bytes, cudaMemcpyHostToDevice);
+   // A very unique SE for checking coordinate systems
+   int se17H = 17;
+   int se17W = 17;
+   cudaImageHost se17("asymmPSF_17x17.txt", se17W, se17H);
+
+   // Circular SE from utilities file
+   int seCircD = 5;
+   cudaImageHost seCirc(seCircD, seCircD);
+   int seCircNZ = createBinaryCircle(seCirc.getDataPtr(), seCircD); // return #non-zero
+
+   // Display the two SEs
+   cout << "Using the unique, 17x17 structuring element:" << endl;
+   se17.printImage();
+   cout << "Other tests using basic circular SE:" << endl;
+   seCirc.printImage();
+
+   // Allocate Device Memory
+   cudaImageDevice devIn(imgIn);
+   cudaImageDevice devPsf(se17);
+   cudaImageDevice devOut(imgW, imgH);
+
+   cudaImageDevice::calculateDeviceMemoryUsage(true);
+
 
    int bx = 8;
    int by = 32;
    int gx = imgW/bx;
    int gy = imgH/by;
-   dim3 BLOCK( bx, by, 1);
-   dim3 GRID(  gx, gy, 1);
+   dim3 BLOCK1D( bx*by, 1, 1);
+   dim3 GRID1D(  nPix/(bx*by), 1, 1);
+   dim3 BLOCK2D( bx, by, 1);
+   dim3 GRID2D(  gx, gy, 1);
 
    /////////////////////////////////////////////////////////////////////////////
    // TEST THE GENERIC/UNIVERSAL MORPHOLOGY OPS
    // Non-zero elts = 134, so use -133 for dilate
-   Morph_Generic_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH, 
+   Morph_Generic_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH, 
                                                 devPsf, se17H/2, se17W/2, -133);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
-   WriteFile("ImageDilate.txt", imgOut, imgW, imgH);
+   devOut.sendToHost(imgOut);
+   imgOut.writeFile("ImageDilate.txt");
 
    // Non-zero elts = 134, so use 134 for erod
-   Morph_Generic_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH, 
+   Morph_Generic_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH, 
                                                 devPsf, se17H/2, se17W/2, 134);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
-   WriteFile("ImageErode.txt", imgOut, imgW, imgH);
+   devOut.sendToHost(imgOut);
+   imgOut.writeFile("ImageErode.txt");
 
    /////////////////////////////////////////////////////////////////////////////
    // We also need to verify that the 3x3 optimized functions work
-   Morph3x3_Dilate_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH);
+   Morph3x3_Dilate_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
-   WriteFile("Image3x3_dilate.txt", imgOut, imgW, imgH);
+   devOut.sendToHost(imgOut);
+   imgOut.writeFile("Image3x3_dilate.txt");
 
-   Morph3x3_Erode4connect_Kernel<<<GRID,BLOCK>>>(devIn, devOut, imgW, imgH);
+   Morph3x3_Erode4connect_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   cudaMemcpy(imgOut, devOut, imgBytes, cudaMemcpyDeviceToHost);
-   WriteFile("Image3x3_erode.txt", imgOut, imgW, imgH);
+   devOut.sendToHost(imgOut);
+   imgOut.writeFile("Image3x3_erode.txt");
 
-   Morph3x3_Thin8_Kernel<<<GRID,BLOCK>>>(devOut, devIn, imgW, imgH);
+   Morph3x3_Thin8_Kernel<<<GRID2D,BLOCK2D>>>(devOut, devIn, imgW, imgH);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   cudaMemcpy(imgIn, devIn, imgBytes, cudaMemcpyDeviceToHost);
-   WriteFile("Image3x3_erode_thin.txt", imgIn, imgW, imgH);
-
-   free(imgIn);
-   free(imgOut);
-   free(seCirc);
-   free(se17);
-   cudaFree(devIn);
-   cudaFree(devOut);
-   cudaFree(devPsf);
+   devIn.sendToHost(imgIn);
+   imgIn.writeFile("Image3x3_erode_thin.txt");
    /////////////////////////////////////////////////////////////////////////////
 }
+
 
 void runWorkbenchUnitTests(void)
 {

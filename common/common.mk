@@ -353,7 +353,7 @@ endif
 
 ifeq ($(keep), 1)
 	NVCCFLAGS += -keep
-	NVCC_KEEP_CLEAN := *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx
+	NVCC_KEEP_CLEAN := *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.cpp
 endif
 
 ifdef maxregisters

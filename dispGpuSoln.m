@@ -47,6 +47,7 @@ function dispGpuSoln()
                      colormap(gray); axis image; title('Erode&Thin Left Side');
    subplot(3,2,6); imagesc(erodethin(row64_right, col64_right));
                      colormap(gray); axis image; title('Erode&Thin Right Side');
+
    
    
    %figure(3);
