@@ -162,29 +162,35 @@ void runCudaImageUnitTests(void)
    h_img3 = h_img2;
    printf("Passed?  %d \n", (int)(h_img3==h_img));
 
-   printf("\t%-50s","Testing ImageDevice constructor and sendToHost");
+   printf("\t%-50s","Testing ImageDevice constructor and copyToHost");
    cudaImageDevice d_img1(h_img3);
    cudaImageHost h_img4(d, d);
-   d_img1.sendToHost(h_img4);
+   d_img1.copyToHost(h_img4);
    printf("Passed?  %d \n", (int)(h_img4==h_img));
    
-   printf("\t%-50s","Testing ImageDevice copyFromHost and sendToHost");
+   printf("\t%-50s","Testing ImageDevice copyFromHost and copyToHost");
    cudaImageDevice d_img2;
    d_img2.copyFromHost(h_img4);
    cudaImageHost h_img5(d,d);
-   d_img2.sendToHost(h_img5);
+   d_img2.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
 
    printf("\t%-50s","Testing ImageDevice another constructor");
    cudaImageDevice d_img3(d, d);
    d_img3.copyFromHost(h_img3);
-   d_img3.sendToHost(h_img5);
+   d_img3.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
 
    printf("\t%-50s","Testing ImageDevice one more constructor");
    cudaImageDevice d_img4(d+1, d+1);
    d_img4.copyFromHost(h_img3);
-   d_img4.sendToHost(h_img5);
+   d_img4.copyToHost(h_img5);
+   printf("Passed?  %d \n", (int)(h_img5==h_img));
+
+   printf("\t%-50s","Testing ImageDevice Device2Device");
+   cudaImageDevice d_img5(d+1, d+1);
+   d_img5.copyFromDevice(h_img4);
+   d_img5.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
 
    cout << endl << endl;
@@ -204,9 +210,15 @@ void runCudaImageUnitTests(void)
    printf("\t\tCopying 64MB from HOST to DEVICE took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
 
    gpuStartTimer();
-   deviceBigImg.sendToHost(hostBigImg);
+   deviceBigImg.copyToHost(hostBigImg);
    gputime = gpuStopTimer();
-   printf("\t\tCopying 64MB from DEVICE to HOST took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
+   printf("\t\tCopying 64MB from DEVICE to HOST took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
+
+   cudaImageDevice copyOfBigImg(4096, 4096);
+   gpuStartTimer();
+   deviceBigImg.copyToDevice(copyOfBigImg);
+   gputime = gpuStopTimer();
+   printf("\t\tCopying 64MB from DEVICE to DEVICE took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
 
    cout << "\tCheck current device memory usage:" << endl;
    cudaImageDevice::calculateDeviceMemoryUsage(true);
@@ -282,31 +294,31 @@ void runMorphologyUnitTests()
    Morph_Generic_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH, 
                                                 devPsf, se17H/2, se17W/2, -133);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   devOut.sendToHost(imgOut);
+   devOut.copyToHost(imgOut);
    imgOut.writeFile("ImageDilate.txt");
 
    // Non-zero elts = 134, so use 134 for erod
    Morph_Generic_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH, 
                                                 devPsf, se17H/2, se17W/2, 134);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   devOut.sendToHost(imgOut);
+   devOut.copyToHost(imgOut);
    imgOut.writeFile("ImageErode.txt");
 
    /////////////////////////////////////////////////////////////////////////////
    // We also need to verify that the 3x3 optimized functions work
    Morph3x3_Dilate_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   devOut.sendToHost(imgOut);
+   devOut.copyToHost(imgOut);
    imgOut.writeFile("Image3x3_dilate.txt");
 
    Morph3x3_Erode4connect_Kernel<<<GRID2D,BLOCK2D>>>(devIn, devOut, imgW, imgH);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   devOut.sendToHost(imgOut);
+   devOut.copyToHost(imgOut);
    imgOut.writeFile("Image3x3_erode.txt");
 
    Morph3x3_Thin8_Kernel<<<GRID2D,BLOCK2D>>>(devOut, devIn, imgW, imgH);
    cutilCheckMsg("Kernel execution failed");  // Check if kernel exec failed
-   devIn.sendToHost(imgIn);
+   devIn.copyToHost(imgIn);
    imgIn.writeFile("Image3x3_erode_thin.txt");
    /////////////////////////////////////////////////////////////////////////////
 }

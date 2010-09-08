@@ -1,10 +1,10 @@
+#include <string.h>
 #include "cudaImageHost.h"
 
 
 ////////////////////////////////////////////////////////////////////////////////
 void cudaImageHost::Allocate(int ncols, int nrows)
 {
-   //printf("***Allocate called!  ");
    imgCols_ = ncols;
    imgRows_ = nrows;
    imgElts_ = imgCols_*imgRows_;
@@ -16,24 +16,18 @@ void cudaImageHost::Allocate(int ncols, int nrows)
    {
       imgData_ = (int*)malloc(imgBytes_);
    }
-   //printf("ID=%d\n", id_);
 }
 
 void cudaImageHost::MemcpyIn(int* dataIn)
 {
-   for(int e=0; e<imgElts_; e++)
-      imgData_[e] = dataIn[e];
+   memcpy(imgData_, dataIn, imgBytes_);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 void cudaImageHost::Deallocate(void)
 {
-   //printf("***Deallocate called!  ID=%d\n", id_); cout.flush();
    if(imgData_ != NULL)
-   {
-      //printImage(); cout.flush();
       free(imgData_);
-   }
    imgData_ = NULL;
    imgCols_ = imgRows_ = imgElts_ = imgBytes_ = 0;
 }
@@ -41,14 +35,17 @@ void cudaImageHost::Deallocate(void)
 void cudaImageHost::resize(int ncols, int nrows)
 {
    // If we already have the right amount of memory, don't do anything
-   if( imgElts_ != ncols*nrows)
+   if( imgElts_ == ncols*nrows)
+   {
+      // imgElts_ and imgBytes_ already correct, don't need to realloc
+      imgCols_ = ncols; 
+      imgRows_ = nrows;
+   }
+   else
    {
       Deallocate();
       Allocate(ncols, nrows);
    }
-   // We could have the same linear array size but different dimensions
-   imgCols_ = ncols; 
-   imgRows_ = nrows;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -102,7 +99,7 @@ void cudaImageHost::operator=(cudaImageHost const & i2)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-bool  cudaImageHost::operator==(cudaImageHost const & i2)
+bool  cudaImageHost::operator==(cudaImageHost const & i2) const
 {
    bool isEq = true;
    if(imgCols_ != i2.imgCols_ || imgRows_ != i2.imgRows_)

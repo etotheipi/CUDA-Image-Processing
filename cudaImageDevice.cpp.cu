@@ -49,19 +49,20 @@ void cudaImageDevice::Deallocate(void)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void cudaImageDevice::MemcpyIn(int* dataIn)
+void cudaImageDevice::resize(int ncols, int nrows)
 {
-   if(imgBytes_ > 0)
-      cudaMemcpy(imgData_, dataIn, imgBytes_, cudaMemcpyHostToDevice);
+   if( imgElts_ == ncols*nrows)
+   {
+      // imgElts_ and imgBytes_ is already correct, no need to realloc
+      imgCols_ = ncols;
+      imgRows_ = nrows;
+   }
+   else
+   {
+      Deallocate();
+      Allocate(ncols, nrows);
+   }
 }
-
-////////////////////////////////////////////////////////////////////////////////
-void cudaImageDevice::MemcpyOut(int* dataOut)
-{
-   if(imgBytes_ > 0)
-      cudaMemcpy(dataOut, imgData_, imgBytes_, cudaMemcpyDeviceToHost);
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageDevice::~cudaImageDevice()
@@ -71,11 +72,7 @@ cudaImageDevice::~cudaImageDevice()
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageDevice::cudaImageDevice() :
-   imgData_(NULL),
-   imgCols_(0),
-   imgRows_(0),
-   imgElts_(0),
-   imgBytes_(0) { }
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0) { }
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageDevice::cudaImageDevice(int ncols, int nrows)
@@ -83,40 +80,96 @@ cudaImageDevice::cudaImageDevice(int ncols, int nrows)
    Allocate(ncols, nrows);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-cudaImageDevice::cudaImageDevice(cudaImageHost & hostImg)
-{
-   Allocate(hostImg.numCols(), hostImg.numRows());
-   MemcpyIn(hostImg.getDataPtr());
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////
-void cudaImageDevice::resize(int ncols, int nrows)
+cudaImageDevice::cudaImageDevice(cudaImageHost const & hostImg)
 {
-   if( imgElts_ != ncols*nrows)
-   {
-      Deallocate();
-      Allocate(ncols, nrows);
-   }
-   imgCols_ = ncols;
-   imgRows_ = nrows;
+   copyFromHost(hostImg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void cudaImageDevice::copyFromHost(cudaImageHost & hostImg)
+cudaImageDevice::cudaImageDevice(cudaImageDevice const & devImg)
 {
-   resize( hostImg.numCols(), hostImg.numRows());
-   MemcpyIn( hostImg.getDataPtr() );
+   copyFromDevice(devImg);
 }
 
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
-// We assume that the host image and device image are the same size
-void cudaImageDevice::sendToHost(cudaImageHost & hostImg)
+////////////////////////////////////////////////////////////////////////////////
+// 
+// MEMORY COPY WRAPPERS
+//
+// These 8 methods handle all the possible ways we might want to copy data in,
+// out, or between device memory locations.  
+//
+// NOTE:  These methods are not designed to explicitly allocate anyone else's
+//        memory, so if we have only a pointer to destination memory, we have 
+//        to assume it is already allocated properly.
+//
+//        If we're passed a reference to a cudaImage, we will call resize()
+//        before copying to it.
+//
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+// HOST <---> DEVICE 
+/////
+void cudaImageDevice::copyFromHost  (int* hostPtr, int ncols, int nrows)
+{
+   resize(ncols, nrows);
+   cudaMemcpy(imgData_, hostPtr, imgBytes_, cudaMemcpyHostToDevice);
+}
+
+/////
+void cudaImageDevice::copyFromHost  (cudaImageHost const & hostImg)
+{
+   copyFromHost(hostImg.getDataPtr(), hostImg.numCols(), hostImg.numRows());
+}
+
+/////
+void cudaImageDevice::copyToHost(int* hostPtr) const
+{
+   cudaMemcpy(hostPtr, imgData_, imgBytes_, cudaMemcpyDeviceToHost);
+}
+
+/////
+void cudaImageDevice::copyToHost(cudaImageHost & hostImg) const
 {
    hostImg.resize(imgCols_, imgRows_);
-   MemcpyOut( hostImg.getDataPtr() );
+   copyToHost(hostImg.getDataPtr());
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// DEVICE <---> DEVICE 
+/////
+void cudaImageDevice::copyFromDevice(int* devicePtr, int ncols, int nrows)
+{
+   resize(ncols, nrows);
+   cudaMemcpy(imgData_, devicePtr, imgBytes_, cudaMemcpyDeviceToDevice);
+}
+
+/////
+void cudaImageDevice::copyFromDevice(cudaImageDevice const & devImg)
+{
+   copyFromDevice(devImg.getDataPtr(), devImg.numCols(), devImg.numRows());
+}
+
+/////
+void cudaImageDevice::copyToDevice(int* devPtr) const
+{
+   cudaMemcpy(devPtr, imgData_, imgBytes_, cudaMemcpyDeviceToDevice);
+}
+
+/////
+void cudaImageDevice::copyToDevice(cudaImageDevice & devImg) const
+{
+   devImg.resize(imgCols_, imgRows_);
+   copyToDevice(devImg.getDataPtr());
+}
+
 
 
 
@@ -153,7 +206,7 @@ int cudaImageDevice::calculateDeviceMemoryUsage(bool dispStdout)
       int wholeMB = totalBytes / sizeMB;
       int fracMB  = (int)(10000 * (float)(totalBytes - wholeMB*sizeMB) / (float)sizeMB);
       printf("\t\t-------------------------------------------------------\n");
-      printf("\t\tTotal Dev Mem Used:                        %4d.%04d MB\n\n", wholeMB, fracMB);
+      printf("\t\tTotal Device Memory Used:                  %4d.%04d MB\n\n", wholeMB, fracMB);
    }
    
    return totalDevMemUsed_;

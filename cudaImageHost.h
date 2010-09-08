@@ -25,8 +25,8 @@ private:
    int  imgBytes_;
 
    void Allocate(int ncols, int nrows);
-   void MemcpyIn(int* dataIn);
    void Deallocate(void);
+   void MemcpyIn(int* dataIn);
 
 public:
 
@@ -40,7 +40,7 @@ public:
    ~cudaImageHost();
 
    void  operator=(cudaImageHost const & img2);
-   bool  operator==(cudaImageHost const & img2);
+   bool  operator==(cudaImageHost const & img2) const;
 
    int   operator()(int c, int r) const { return imgData_[c*imgRows_+r];}
    int & operator()(int c, int r)       { return imgData_[c*imgRows_+r];}
@@ -51,11 +51,11 @@ public:
    void writeFile(string filename) const;
    void printImage(void) const;
 
-   int* getDataPtr(void)  {return imgData_;}
-   int  numCols(void)     {return imgCols_;}
-   int  numRows(void)     {return imgRows_;}
-   int  numElts(void)     {return imgElts_;}
-   int  numBytes(void)    {return imgBytes_;}
+   int* getDataPtr(void)  const {return imgData_;}
+   int  numCols(void)     const {return imgCols_;}
+   int  numRows(void)     const {return imgRows_;}
+   int  numElts(void)     const {return imgElts_;}
+   int  numBytes(void)    const {return imgBytes_;}
 };
 
 #endif

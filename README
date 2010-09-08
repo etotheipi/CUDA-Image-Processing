@@ -1,5 +1,5 @@
 
-Binary Mask Morphology in C++ using CUDA
+Image Processing in C++ using CUDA
 
 Ridiculously fast morphology and convolutions using an NVIDIA GPU!
 
@@ -11,17 +11,16 @@ Email:        etotheipi@gmail.com
 
 
 -----
-This a BETA version of a complete morphological image processing library
-using CUDA.  CUDA is an NVIDIA programming interfact for harnessing your
-NVIDIA graphics card to do computations (instead of just graphics).  For
-problems that are highly parallelizable (like convolution or morphology)
-you can get speedups of several orders of magnitude.  
+This a BETA version of a complete morph/convolve image processing library
+using CUDA.  CUDA is an NVIDIA programming interface for harnessing your
+NVIDIA graphics card to do computations.  For problems that are highly 
+parallelizable (like convolution or morphology) you can get speedups of 
+several orders of magnitude.  
 
-For instance, to dilate a 4096x4096 mask with a 15x15 structuring elt,
+For instance, to convolve a 4096x4096 mask with a 15x15 point-spread fn,
 the CPU would take anywhere from 5 to 20 seconds.  Using this library 
 with an NVIDIA GTX 460, the operation takes less than 0.1 seconds!  You
-can see nearly identical speed improvements with regular convolutions of
-ints or floats (this code is easily adapted to do regular convolutions).
+can see nearly identical speed improvements with morphological operations.
 
 To use this library, you will need the CUDA 3.1 toolkit, and you might
 have to move a few libraries into your linker path.  And of course, you
@@ -29,7 +28,7 @@ need a CUDA-enabled graphics card (Fermi recommended, others will prob
 work;  more on that below).
 
 
-This library is designed to be used for performing a sequence of morph
+This library is designed to be used for performing a sequence of image
 operations on a single image/mask.  This is standard for morphological
 processing, but also keeping the memory on the device saves a lot of 
 time.  The saying at my workplace is, "Copying data in and out of the
@@ -48,6 +47,16 @@ systems.  Just remember, CUDA is NOT open-source, and the licensing
 will not be favorable to OSS projects.
 
 
+***IMPORTANT NOTE***
+
+   I hate makefiles.  And w/ CUDA, they got more complicated, so I am using
+   the canned common/common.mk makefile that comes with the CUDA SDK.  
+
+      THIS MAKEFILE ERASES *.cpp FILES WHEN CALLING "make clean"
+
+   I don't know how to fix this.  Perhaps someone else knows.  Just be sure
+   not to check-in your cpp code before cleaning.
+   
 
 -----
 Supported Hardware:
@@ -55,7 +64,7 @@ Supported Hardware:
    This code was designed for NVIDIA devices of Compute Capability 2.0+
    which is any NVIDIA GTX 4XX series card (Fermi).  The code *should*
    compile and run on 1.X devices, but the code is not optimized for them
-   so there may be a huge performance hit.  Maybe not.  (see note below
+   so there may be a huge performance hit.  Maybe not.  (SEE NOTE BELOW
    about compiling for 1.X GPUs)
 
    I believe NVIDIA 8800 GT is the earliest NVIDIA card that supports
@@ -101,10 +110,12 @@ To work with older NVIDIA cards (8800+ GT, 9XXX GT, GTX 2XX):
 
    Open commom/common.mk and around line 150, uncomment the GENCODE_SM10
    line, which enables dual-compilation for CUDA Compute Capability 1.X
-   devices.  The reason I commented this out is that 1.X devices don't
+   devices.  
+
+   The reason I commented this out is that 1.X devices don't
    support printf(), which is my main method for debugging.  Therefore,
    leaving this line in the Makefile prevents the code from compiling 
-   when I'm attempting to debug.
+   when I am attempting to debug.
 
 
 -----
@@ -114,4 +125,16 @@ Planned Updates
      that have arbitrary dimensions.  Currently, it is assumed that the
      input has dimensions that are multiples of 32.
 
+   - In the future, I plan add preprocessors which branch the compiled code
+     based on CUDA architecture.  It may be as simple as choosing new block
+     sizes, or reworking some of the algorithms.  The point is, the code is
+     currently written with Compute Capability 2.0+ in mind, and who knows
+     what happens when run on 1.X device.
+
+   - Add some reduction code for summing up large arrays (for instance,
+     subtracting two images and summing to find the difference)
+
+   - Right now my focus has been on morphology, though regular convolution
+     HAS been implemented.  I will implement a more-exhaustive array of 
+     image processing functions, such as more filters and FFTs.
 

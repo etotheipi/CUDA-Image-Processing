@@ -24,8 +24,6 @@ private:
 
    void Allocate(int ncols, int nrows);
    void Deallocate(void);
-   void MemcpyIn(int* dataIn);
-   void MemcpyOut(int* dataOut);
 
    // Keep a master list of device memory allocations
    static list<cudaImageDevice*> masterDevImageList_;
@@ -36,22 +34,36 @@ public:
    void resize(int ncols, int nrows);
    int id_;
 
+   // Basic constructors
    cudaImageDevice();
    cudaImageDevice(int ncols, int nrows);
-   cudaImageDevice(cudaImageHost & hostImg);
+   cudaImageDevice(cudaImageHost   const & hostImg);
+   cudaImageDevice(cudaImageDevice const &  devImg);
    ~cudaImageDevice();
 
-   void copyFromHost(cudaImageHost & hostImg);
-   void sendToHost(cudaImageHost & hostImg);
+   // Copying memory Host<->Device
+   void copyFromHost  (int* hostPtr, int ncols, int nrows);
+   void copyFromHost  (cudaImageHost const & hostImg);
+   void copyToHost    (int* hostPtr) const;
+   void copyToHost    (cudaImageHost & hostImg) const;
 
+   // Copying memory Device<->Device
+   void copyFromDevice  (int* devicePtr, int ncols, int nrows);
+   void copyFromDevice  (cudaImageDevice const & deviceImg);
+   void copyToDevice    (int* devicePtr) const;
+   void copyToDevice    (cudaImageDevice & deviceImg) const;
+
+
+   // Implicit cast to int* for functions that require int*
    operator int*() { return imgData_;}
-
-   int* getDataPtr(void)  {return imgData_;}
-   int  numCols(void)  {return imgCols_;}
-   int  numRows(void)  {return imgRows_;}
-   int  numElts(void)  {return imgElts_;}
-
    static int calculateDeviceMemoryUsage(bool dispStdout=false);
+
+   int* getDataPtr(void) const {return imgData_;}
+   int  numCols(void)    const {return imgCols_;}
+   int  numRows(void)    const {return imgRows_;}
+   int  numElts(void)    const {return imgElts_;}
+   int  numBytes(void)   const {return imgBytes_;}
+
 };
 
 #endif
