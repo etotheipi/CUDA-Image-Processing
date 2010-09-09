@@ -218,7 +218,7 @@ void runCudaImageUnitTests(void)
    gpuStartTimer();
    deviceBigImg.copyToDevice(copyOfBigImg);
    gputime = gpuStopTimer();
-   printf("\t\tCopying 64MB from DEVICE to DEVICE took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
+   printf("\t\tCopying 64MB within DEVICE took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
 
    cout << "\tCheck current device memory usage:" << endl;
    cudaImageDevice::calculateDeviceMemoryUsage(true);

@@ -356,13 +356,13 @@ int createBinaryCircle(int*   targPtr,
 //        operators will operate with {-1,0,1}
 //
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void  MaskUnion_Kernel( int* A, int* B, int* devOut);
-__global__ void  MaskIntersect_Kernel( int* A, int* B, int* devOut);
-__global__ void  MaskSubtract_Kernel( int* A, int* B, int* devOut);
-__global__ void  MaskInvert_Kernel( int* A, int* devOut);
-__global__ void  MaskCopy_Kernel( int* A, int* devOut);
-__global__ void  MaskCountDiff_Kernel( int* A, int* B, int* globalMemCount);
-__global__ void  MaskSum_Kernel( int* A, int* globalMemSum);
+__global__ void  Mask_Union_Kernel(     int* srcA, int* srcB, int* dst);
+__global__ void  Mask_Intersect_Kernel( int* srcA, int* srcB, int* dst);
+__global__ void  Mask_Subtract_Kernel(  int* srcA, int* srcB, int* dst);
+__global__ void  Mask_CountDiff_Kernel( int* srcA, int* srcB, int* dstScalar);
+__global__ void  Mask_Invert_Kernel(    int* srcA,            int* dst);
+__global__ void  Mask_Copy_Kernel(      int* srcA,            int* dst);
+__global__ void  Mask_Sum_Kernel(       int* srcA,            int* dstScalar);
 
 
 #endif

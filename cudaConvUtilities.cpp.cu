@@ -275,7 +275,7 @@ void prepareCudaTexture(float* h_src,
 ////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void  MaskUnion_Kernel( int* A, int* B, int* devOut)
+__global__ void  Mask_Union_Kernel( int* A, int* B, int* devOut)
 {  
    const int idx = blockDim.x*blockIdx.x + threadIdx.x;
 
@@ -286,7 +286,7 @@ __global__ void  MaskUnion_Kernel( int* A, int* B, int* devOut)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void  MaskIntersect_Kernel( int* A, int* B, int* devOut)
+__global__ void  Mask_Intersect_Kernel( int* A, int* B, int* devOut)
 {  
    const int idx = blockDim.x*blockIdx.x + threadIdx.x;
    devOut[idx] = A[idx] * B[idx];
@@ -294,7 +294,7 @@ __global__ void  MaskIntersect_Kernel( int* A, int* B, int* devOut)
 
 ////////////////////////////////////////////////////////////////////////////////
 // (A - B):   A is set to 0 if B is 1, otherwise A is left alone
-__global__ void  MaskSubtract_Kernel( int* A, int* B, int* devOut)
+__global__ void  Mask_Subtract_Kernel( int* A, int* B, int* devOut)
 {  
    const int idx = blockDim.x*blockIdx.x + threadIdx.x;
    if( B[idx] == 0)
@@ -304,7 +304,7 @@ __global__ void  MaskSubtract_Kernel( int* A, int* B, int* devOut)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void  MaskInvert_Kernel( int* A, int* devOut)
+__global__ void  Mask_Invert_Kernel( int* A, int* devOut)
 {  
    const int idx = blockDim.x*blockIdx.x + threadIdx.x;
    devOut[idx] = 1 - A[idx];
@@ -314,7 +314,7 @@ __global__ void  MaskInvert_Kernel( int* A, int* devOut)
 ////////////////////////////////////////////////////////////////////////////////
 // TODO: This is a very dumb/slow equal operator, actually won't even work
 //       Perhaps have the threads atomicAdd to a globalMem location if !=
-//__global__ void  MaskCountDiff_Kernel( int* A, int* B, int* globalMemCount)
+//__global__ void  Mask_CountDiff_Kernel( int* A, int* B, int* globalMemCount)
 //{  
    //const int idx = blockDim.x*blockIdx.x + threadIdx.x;
    //if(A[idx] != B[idx])
@@ -324,7 +324,7 @@ __global__ void  MaskInvert_Kernel( int* A, int* devOut)
 
 ////////////////////////////////////////////////////////////////////////////////
 // TODO: Need to use reduction for this, but that can be kind of complicated
-//__global__ void  MaskSum_Kernel( int* A, int* globalMemSum)
+//__global__ void  Mask_Sum_Kernel( int* A, int* globalMemSum)
 //{  
    //const int idx = blockDim.x*blockIdx.x + threadIdx.x;
    //if(A[idx] != B[idx])

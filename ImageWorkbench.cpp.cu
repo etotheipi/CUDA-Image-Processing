@@ -39,26 +39,16 @@ int ImageWorkbench::addStructElt(cudaImageHost const & seHost)
 
 
 /////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::setBlockSize(dim3 newSize)
+void ImageWorkbench::setBlockSize1D(int nthreads)
 {
-   BLOCK_ = newSize;
-   GRID_ = dim3(imgCols_/BLOCK_.x, imgRows_/BLOCK_.y, 1);
+   BLOCK_2D_ = dim3(nthreads, 1, 1);
+   GRID_2D_  = dim3(imgElts_/BLOCK_1D_.x, 1, 1);
 }
-
 /////////////////////////////////////////////////////////////////////////////
-cudaImageDevice* ImageWorkbench::EXTRA_BUF(int n)
+void ImageWorkbench::setBlockSize2D(int ncols, int nrows)
 {
-   while(n+1 > (int)extraBuffers_.size())
-      createExtraBuffer();
-   return &extraBuffers_[n];
-}
-
-/////////////////////////////////////////////////////////////////////////////
-cudaImageDevice* ImageWorkbench::TEMP_BUF(int n)
-{
-   while(n+1 > (int)tempBuffers_.size())
-      createTempBuffer();
-   return &tempBuffers_[n];
+   BLOCK_2D_ = dim3(ncols, nrows, 1);
+   GRID_2D_  = dim3(imgCols_/BLOCK_2D_.x, imgRows_/BLOCK_2D_.y, 1);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -111,13 +101,14 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    imgElts_  = hostImg.numElts();
    imgBytes_ = hostImg.numBytes();
 
-   // 32x8 dramatically reduces bank conflicts, compared to 16x16
-   int bx = 32;
-   int by = 8;
-   int gx = imgCols_/bx;
-   int gy = imgRows_/by;
-   BLOCK_ = dim3(bx, by, 1);
-   GRID_  = dim3(gx, gy, 1);
+   // 256 threads is a great block size for all 2.0+ devices, since that 
+   // would be 6 blocks/multiprocessor which is less than the max of 8,
+   // and more than enough to hide latency (assuming SHMEM and #registers
+   // are low enough to allow 6 blocks/MP).
+   setBlockSize1D(256);
+
+   // For 2D, 32x8 dramatically reduces bank conflicts, compared to 16x16
+   setBlockSize2D(32, 8);
 
    extraBuffers_ = vector<cudaImageDevice>(0);
    tempBuffers_  = vector<cudaImageDevice>(0);
@@ -128,38 +119,142 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    // BufferA is input for a morph op, BufferB is the target, then switch
    bufferPtrA_ = &buffer1_;
    bufferPtrB_ = &buffer2_;
-   buf1_in_buf2_out_ = true;
-
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 // Copy the current state of the buffer to the host
-void ImageWorkbench::copyResultToHost(cudaImageHost & hostImg)
+void ImageWorkbench::copyResultToHost(cudaImageHost & hostImg) const
 {
-   cudaThreadSynchronize();
    bufferPtrA_->copyToHost(hostImg);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::copyResultToDevice(cudaImageDevice & hostImg) const
+{
+   bufferPtrA_->copyToDevice(hostImg);
+}
+
+
+/////////////////////////////////////////////////////////////////////////////
+// This method is used to push/pull data to/from external locations
+void ImageWorkbench::copyBufferToHost( BUF_TYPE bt,
+                                       int idx, 
+                                       cudaImageHost & hostOut) const
+{
+   // Need to do it this way because using getBufferPtr() is not const and
+   // I want this function to be const
+   if(bt == BUF_EXTRA)
+      extraBuffers_[idx].copyToHost(hostOut);
+   else
+      if(idx==A)
+         bufferPtrA_->copyToHost(hostOut);
+      else
+         bufferPtrB_->copyToHost(hostOut);
+}
+/////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::copyBufferToDevice( BUF_TYPE bt,
+                                         int idx,
+                                         cudaImageDevice & devOut) const
+{
+   // Need to do it this way because using getBufferPtr() is not const and
+   // I want this function to be const
+   if(bt == BUF_EXTRA)
+      extraBuffers_[idx].copyToDevice(devOut);
+   else
+      if(idx==A)
+         bufferPtrA_->copyToDevice(devOut);
+      else
+         bufferPtrB_->copyToDevice(devOut);
+}
+/////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::copyHostToBuffer( cudaImageHost const & hostIn,
+                                       BUF_TYPE bt,
+                                       int idx)
+{
+   if(hostIn.numCols() == imgCols_ && hostIn.numRows() == imgRows_)
+      getBufferPtr(bt, idx)->copyFromHost(hostIn);
+   else
+   {
+      printf("***ERROR:  can only copy images of same size as workbench (%dx%d)",
+                                    imgCols_, imgRows_);
+   }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::copyDeviceToBuffer( cudaImageDevice const & devIn,
+                                             BUF_TYPE bt,
+                                             int idx)
+{
+   if(devIn.numCols() == imgCols_ && devIn.numRows() == imgRows_)
+      getBufferPtr(bt, idx)->copyFromDevice(devIn);
+   else
+   {
+      printf("***ERROR:  can only copy images of same size as workbench (%dx%d)",
+                                    imgCols_, imgRows_);
+   }
 }
 
 
 /////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::flipBuffers(void)
 {
-   if(buf1_in_buf2_out_ == false)
+   if(bufferPtrA_ == &buffer2_)
    {
       bufferPtrA_ = &buffer1_;
       bufferPtrB_ = &buffer2_;
-      buf1_in_buf2_out_ = true;
    }
    else
    {
       bufferPtrA_ = &buffer2_;
       bufferPtrB_ = &buffer1_;
-      buf1_in_buf2_out_ = false;
    }
 }
 
-/*
+/////////////////////////////////////////////////////////////////////////////
+cudaImageDevice* ImageWorkbench::getBufferPtr( BUF_TYPE type, 
+                                               int idx)
+{
+   // BUF_TEMP not allowed
+   return getBufPtrAny(type, idx, false);
+}
+
+/////////////////////////////////////////////////////////////////////////////
+cudaImageDevice* ImageWorkbench::getBufPtrAny( BUF_TYPE type, 
+                                               int idx, 
+                                               bool allowTemp)
+{
+   if(type == BUF_PRIMARY)
+   {
+      if(idx == A)
+         return bufferPtrA_;
+      else if(idx == B)
+         return bufferPtrA_;
+      else
+         cout << "***ERROR:  no primary buffer #" << idx << endl;
+   }
+   else if(type == BUF_EXTRA)
+   {
+      while(idx+1 > (int)extraBuffers_.size())
+         createExtraBuffer();
+      return &extraBuffers_[idx];
+   }
+   else if(type == BUF_TEMP)
+   {
+      if(allowTemp)
+      {
+         while(idx+1 > (int)tempBuffers_.size())
+            createTempBuffer();
+         return &tempBuffers_[idx];
+      }
+      else
+         cout << "***ERROR:  temp buffers only accessible to IWB methods"<<endl;
+   }
+   else
+      cout << "***ERROR:  no buffer-type " << type << endl;
+
+   return NULL;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -170,37 +265,39 @@ void ImageWorkbench::flipBuffers(void)
 ////////////////////////////////////////////////////////////////////////////////
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::GenericMorphOp(int seIndex, int targSum)
+void ImageWorkbench::GenericMorphOp(int seIndex, int targSum,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  *bufferPtrA_,
-                  *bufferPtrB_,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, false)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, false)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numRows()/2,
                   targSum);
-   flipBuffers();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::HitOrMiss(int seIndex)
+void ImageWorkbench::HitOrMiss(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  *bufferPtrA_,
-                  *bufferPtrB_,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
-                  se.getNonZero());
-   flipBuffers();
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, false)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, false)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,
+                  se->numRows()/2,
+                  masterListSENZ_[seIndex]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -209,130 +306,76 @@ void ImageWorkbench::HitOrMiss(int seIndex)
 // only of 1s (ON) and 0s (DONTCARE), while the HitOrMiss operation takes
 // SEs that also have -1s (OFF).  However, this implementation allows -1s in 
 // any SE, so they are interchangeable.
-void ImageWorkbench::Erode(int seIndex)
+void ImageWorkbench::Erode(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   HitOrMiss(seIndex);
+   HitOrMiss(seIndex, srctype, srcidx, dsttype, dstidx);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::Dilate(int seIndex)
+void ImageWorkbench::Dilate(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  *bufferPtrA_,
-                  *bufferPtrB_,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
-                  -se.getNonZero()+1);
-   flipBuffers();
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, false)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, false)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,
+                  se->numRows()/2,
+                  -masterListSENZ_[seIndex]+1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::Median(int seIndex)
+void ImageWorkbench::Median(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  *bufferPtrA_,
-                  *bufferPtrB_,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, false)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, false)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,
+                  se->numRows()/2,
                   0);
-   flipBuffers();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::Open(int seIndex)
+void ImageWorkbench::Open(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   int* tbuf = getExtraBufferPtr(0);
-   ZErode(seIndex, *bufferPtrA_, tbuf);
-   ZDilate(seIndex, tbuf, *bufferPtrB_);
-   flipBuffers();
+   ZDilate( seIndex, srctype, srcidx, BUF_TEMP, 0);
+   ZErode ( seIndex, BUF_TEMP, 0, dsttype, dstidx);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::Close(int seIndex)
+void ImageWorkbench::Close(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   int* tbuf = getExtraBufferPtr(0);
-   ZDilate(seIndex, *bufferPtrA_, tbuf);
-   ZErode(seIndex, tbuf, *bufferPtrB_);
-   flipBuffers();
+   ZDilate( seIndex, srctype, srcidx, BUF_TEMP, 0);
+   ZErode ( seIndex, BUF_TEMP, 0, dsttype, dstidx);
 }
 
-void ImageWorkbench::FindAndRemove(int seIndex)
+void ImageWorkbench::FindAndRemove(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   int* tbuf = getExtraBufferPtr(0);
-   ZHitOrMiss(seIndex, *bufferPtrA_, tbuf);
-   ZSubtract(tbuf, *bufferPtrA_, *bufferPtrB_);
-   flipBuffers();
+   ZHitOrMiss(seIndex, srctype, srcidx, BUF_TEMP, 0);
+   ZSubtract(srctype, srcidx, BUF_TEMP, 0, dsttype, dstidx);
 }
 
 
-////////////////////////////////////////////////////////////////////////////////
-//
-// These are the basic binary mask operations
-//
-// These are CPU methods which wrap the GPU kernel functions
-//
-////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::Union(int* devMask2)
-{
-   MaskUnion_Kernel<<<GRID_,BLOCK_>>>(
-                              *bufferPtrA_, 
-                               devMask2, 
-                              *bufferPtrB_);
-   flipBuffers();
-}
-
-void ImageWorkbench::Intersect(int* devMask2)
-{
-   MaskIntersect_Kernel<<<GRID_,BLOCK_>>>(
-                              *bufferPtrA_,
-                               devMask2,
-                              *bufferPtrB_);
-   flipBuffers();
-}
-
-void ImageWorkbench::Subtract(int* devMask2)
-{
-   MaskSubtract_Kernel<<<GRID_,BLOCK_>>>(
-                              *bufferPtrA_,
-                               devMask2,
-                              *bufferPtrB_);
-   flipBuffers();
-}
-
-void ImageWorkbench::Invert()
-{
-   MaskInvert_Kernel<<<GRID_,BLOCK_>>>(
-                              *bufferPtrA_, 
-                              *bufferPtrB_);
-   flipBuffers();
-}
-
-void ImageWorkbench::CopyBuffer(int* dst)
-{
-   cudaMemcpy(dst,   
-              *bufferPtrA_,  
-              imageBytes_, 
-              cudaMemcpyDeviceToDevice);
-}
-
-// Since this is static, 
-void ImageWorkbench::CopyBuffer(int* src, int* dst, int bytes)
-{
-   cudaMemcpy(dst,   
-              src,
-              bytes, 
-              cudaMemcpyDeviceToDevice);
-}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -354,7 +397,7 @@ void ImageWorkbench::CopyBuffer(int* src, int* dst, int bytes)
 //          Thin4();
 //          ...
 //          Thin8();
-   //    }
+//    }
 //
 // The user wants to know whether the mask has reached equilibrium and
 // calls NumChanged(), expecting to see 0 if it is at equilibrium.  The 
@@ -366,35 +409,39 @@ void ImageWorkbench::CopyBuffer(int* src, int* dst, int bytes)
 // Remember that SRC and DST are both device memory pointers
 // which is another reason these are private
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::ZGenericMorphOp(int seIndex, int targSum, int* src, int* dst)
+void ImageWorkbench::ZGenericMorphOp(int seIndex, int targSum,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  src,
-                  dst,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, true)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, true)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numRows()/2,
                   targSum);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::ZHitOrMiss(int seIndex, int* src, int* dst)
+void ImageWorkbench::ZHitOrMiss(int seIndex, 
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  src,
-                  dst,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
-                  se.getNonZero());
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, true)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, true)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numRows()/2,
+                  masterListSENZ_[seIndex]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -403,57 +450,65 @@ void ImageWorkbench::ZHitOrMiss(int seIndex, int* src, int* dst)
 // only of 1s (ON) and 0s (DONTCARE), while the HitOrMiss operation takes
 // SEs that also have -1s (OFF).  However, this implementation allows -1s in 
 // any SE, so they are interchangeable.
-void ImageWorkbench::ZErode(int seIndex, int* src, int* dst)
+void ImageWorkbench::ZErode(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   //ZHitOrMiss(seIndex, int* src, int* dst);
+   ZHitOrMiss(seIndex, srctype, srcidx, dsttype, dstidx);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::ZDilate(int seIndex, int* src, int* dst)
+void ImageWorkbench::ZDilate(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  src,
-                  dst,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
-                  -se.getNonZero()+1);
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, true)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, true)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numRows()/2,
+                  -masterListSENZ_[seIndex]+1);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::ZMedian(int seIndex, int* src, int* dst)
+void ImageWorkbench::ZMedian(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   StructElt const & se = masterSEList_[seIndex];
+   cudaImageDevice* se = &masterListSE_[seIndex];
 
-   Morph_Generic_Kernel<<<GRID_,BLOCK_>>>(
-                  src,
-                  dst,
-                  imageCols_,
-                  imageRows_,
-                  se.getDevPtr(),
-                  se.getCols()/2,
-                  se.getRows()/2,
+   Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
+                  getBufPtrAny(srctype, srcidx, true)->getDataPtr(),
+                  getBufPtrAny(dsttype, dstidx, true)->getDataPtr(),
+                  imgCols_,
+                  imgRows_,
+                  se->getDataPtr(),
+                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numRows()/2,
                   0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::ZOpen(int seIndex, int* src, int* dst, int useTempBuf)
+void ImageWorkbench::ZOpen(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   int* tbuf = getExtraBufferPtr(useTempBuf);
-   ZErode(seIndex, src, tbuf);
-   ZDilate(seIndex, tbuf, dst);
+   ZErode( seIndex, srctype, srcidx, BUF_TEMP, 0);
+   ZDilate(seIndex, BUF_TEMP, 0, dsttype, dstidx);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::ZClose(int seIndex, int* src, int* dst, int useTempBuf)
+void ImageWorkbench::ZClose(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   int* tbuf = getExtraBufferPtr(useTempBuf);
-   ZErode(seIndex, src, tbuf);
-   ZDilate(seIndex, tbuf, dst);
+   ZDilate( seIndex, srctype, srcidx, BUF_TEMP, 0);
+   ZErode(  seIndex, BUF_TEMP, 0, dsttype, dstidx);
 }
 
 
@@ -461,16 +516,17 @@ void ImageWorkbench::ZClose(int seIndex, int* src, int* dst, int useTempBuf)
 // Can't remember what this is supposed to be called, but it's the process by 
 // which you do a Hit-or-Miss operation which is expected to return a sparse
 // mask that fully intersects the original image, and then subtract. 
-void ImageWorkbench::ZFindAndRemove(int seIndex, int* src, int* dst, int useTempBuf)
+void ImageWorkbench::ZFindAndRemove(int seIndex,
+                              BUF_TYPE srctype, int srcidx,
+                              BUF_TYPE dsttype, int dstidx)
 {
-   int* tbuf = getExtraBufferPtr(useTempBuf);
-   ZHitOrMiss(seIndex, src, tbuf);
-   ZSubtract(tbuf, src, dst);
+   ZHitOrMiss(seIndex, srctype, srcidx, BUF_TEMP, 0);
+   ZSubtract(BUF_TEMP, 0, srctype, srcidx, dsttype, dstidx);
 }
 
 //int ImageWorkbench::NumPixelsChanged()
 //{
-   //MaskCountDiff_Kernel<<<GRID_,BLOCK_>>>(
+   //MaskCountDiff_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                                // *bufferPtrA_, 
                                // *bufferPtrB_, 
                                //&nChanged);
@@ -480,80 +536,49 @@ void ImageWorkbench::ZFindAndRemove(int seIndex, int* src, int* dst, int useTemp
 
 //int ImageWorkbench::SumMask()
 //{
-   //MaskSum_Kernel<<<GRID_,BLOCK_>>>(
+   //MaskSum_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                                // *bufferPtrA_, 
                                // *bufferPtrB_, 
                                //&nChanged);
    // No flip
 //}
 
-void ImageWorkbench::ZUnion(int* devMask2, int* src, int* dst)
-{
-   MaskUnion_Kernel<<<GRID_,BLOCK_>>>(
-                               src, 
-                               devMask2, 
-                               dst);
-}
-
-void ImageWorkbench::ZIntersect(int* devMask2, int* src, int* dst)
-{
-   MaskIntersect_Kernel<<<GRID_,BLOCK_>>>(
-                               src,
-                               devMask2,
-                               dst);
-}
-
-void ImageWorkbench::ZSubtract(int* devMask2, int* src, int* dst)
-{
-   MaskSubtract_Kernel<<<GRID_,BLOCK_>>>(
-                               src,
-                               devMask2,
-                               dst);
-}
-
-void ImageWorkbench::ZInvert(int* src, int* dst)
-{
-   MaskInvert_Kernel<<<GRID_,BLOCK_>>>( src, dst);
-}
-
 /////////////////////////////////////////////////////////////////////////////
 // With all ZOperations implemented, I can finally implement complex batch
 // operations like Thinning
 void ImageWorkbench::ThinningSweep(void)
 {
-   int* tbuf0 = getExtraBufferPtr(0);
+   // 1  (A->temp0->B)
+   ZThin1   ( BUF_PRIMARY, A,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, A,  BUF_PRIMARY, B);
 
-   // 1  (A->B)
-   ZThin1(*bufferPtrA_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrA_, *bufferPtrB_);
+   // 2  (B->temp0->B)
+   ZThin2   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 2  (B->B)
-   ZThin2(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 3  (B->temp0->B)
+   ZThin3   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 3  (B->B)
-   ZThin3(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 4  (B->temp0->B)
+   ZThin4   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 4  (B->B)
-   ZThin4(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 5  (B->temp0->B)
+   ZThin5   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 5  (B->B)
-   ZThin5(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 6  (B->temp0->B)
+   ZThin6   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 6  (B->B)
-   ZThin6(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 7  (B->temp0->B)
+   ZThin7   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 7  (B->B)
-   ZThin7(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
-
-   // 8  (B->B)
-   ZThin8(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 8  (B->temp0->B)
+   ZThin8   ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
    // And we're done
    flipBuffers();
@@ -562,41 +587,38 @@ void ImageWorkbench::ThinningSweep(void)
 /////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::PruningSweep(void)
 {
-   int* tbuf0 = getExtraBufferPtr(0);
+   // 1  (A->temp0->B)
+   ZPrune1  ( BUF_PRIMARY, A,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, A,  BUF_PRIMARY, B);
 
-   // 1  (A->B)
-   ZPrune1(*bufferPtrA_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrA_, *bufferPtrB_);
+   // 2  (B->temp0->B)
+   ZPrune2  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 2  (B->B)
-   ZPrune2(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 3  (B->temp0->B)
+   ZPrune3  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 3  (B->B)
-   ZPrune3(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 4  (B->temp0->B)
+   ZPrune4  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 4  (B->B)
-   ZPrune4(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 5  (B->temp0->B)
+   ZPrune5  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 5  (B->B)
-   ZPrune5(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 6  (B->temp0->B)
+   ZPrune6  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 6  (B->B)
-   ZPrune6(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 7  (B->temp0->B)
+   ZPrune7  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
-   // 7  (B->B)
-   ZPrune7(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
-
-   // 8  (B->B)
-   ZPrune8(*bufferPtrB_, tbuf0);
-   ZSubtract(tbuf0, *bufferPtrB_, *bufferPtrB_);
+   // 8  (B->temp0->B)
+   ZPrune8  ( BUF_PRIMARY, B,  BUF_TEMP,    0);
+   ZSubtract( BUF_TEMP,    0,  BUF_PRIMARY, B,  BUF_PRIMARY, B);
 
    // And we're done
    flipBuffers();
 }
-*/
