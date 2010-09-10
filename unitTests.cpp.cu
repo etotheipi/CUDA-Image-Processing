@@ -341,7 +341,6 @@ void runWorkbenchUnitTests(void)
 
    // Read the salt image from file
    cudaImageHost imgIn("salt256.txt", 256, 256);
-   imgIn.printMask();
 
    // Create a place to put the result
    cudaImageHost imgOut(64, 64);
@@ -388,57 +387,64 @@ void runWorkbenchUnitTests(void)
 
    // Start by simply fetching the unmodified image (sanity check)
    cout << "Copying unaltered image back to host for verification" << endl;
-   theIwb.copyResultToHost(imgOut);
+   theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench1_In.txt");
    
    // Dilate by the circle
    cout << "Dilating with 11x11 circle" << endl;
    theIwb.Dilate(seIdxCircle11);
-   theIwb.copyResultToHost(imgOut);
+   theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench2_DilateCirc.txt");
 
    // We Erode the image now, but with the basic 3x3
    cout << "Performing simple 3x3 erode" << endl;
    theIwb.Erode();
-   theIwb.copyResultToHost(imgOut);
+   theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench3_Erode3.txt");
+
+   // We Erode the image now, but with the basic 3x3
+   cout << "Try a closing operation" << endl;
+   theIwb.Close(seIdxCircle11);
+   theIwb.copyBufferToHost(imgOut);
+   imgOut.writeFile("Workbench4_Close.txt");
 
    // We now test subtract by eroding an image w/ 3x3 and subtracting from original
    // Anytime we manually select src/dst for image operations, make sure we end up
    // with the final result in buffer A, or in buffer B with a a call to flipBuffers()
    // to make sure that our input/output locations are consistent
-   cout << "Dilate before testing subtraction" << endl;
-   theIwb.Dilate();
-   theIwb.copyResultToHost(imgOut);
-   imgOut.writeFile("Workbench3a_Subtract.txt");
+   ImageWorkbench iwb2(imgIn);
+   cout << "Testing subtract kernel" << endl;
+   
+   iwb2.Dilate();
+   iwb2.Dilate();
+   iwb2.copyBufferToHost(imgOut);
+   imgOut.writeFile("Workbench5a_dilated.txt");
 
-   cout << "Erode to get second operand of subtraction" << endl;
-   theIwb.Erode(A, 1);
+   iwb2.Erode(A, 1);  // put result in buffer 1, don't flip
+   iwb2.copyBufferToHost(1, imgOut);
+   imgOut.writeFile("Workbench5b_erode.txt");
+   
+   iwb2.Subtract(1, A, A);
+   iwb2.copyBufferToHost(A, imgOut);
+   imgOut.writeFile("Workbench5c_subtract.txt");
 
-   cout << "Subtract the eroded image from the dilated image" << endl;
-   theIwb.Subtract(1, A, A);
-   theIwb.copyResultToHost(imgOut);
-   imgOut.writeFile("Workbench3b_Subtract.txt");
+   cudaImageHost cornerDetect(3,3);
+   cornerDetect(0,0) = -1;  cornerDetect(1,0) = -1;  cornerDetect(2,0) = 0;
+   cornerDetect(0,1) = -1;  cornerDetect(1,1) =  1;  cornerDetect(2,1) = 1;
+   cornerDetect(0,2) =  0;  cornerDetect(1,2) =  1;  cornerDetect(2,2) = 0;
+   int seIdxCD = ImageWorkbench::addStructElt(cornerDetect);
+   iwb2.FindAndRemove(seIdxCD);
+   iwb2.copyBufferToHost(imgOut);
+   imgOut.writeFile("Workbench5d_findandrmv.txt");
 
-   // Dilate with rectangle
-   cout << "Rectangular dilate" << endl;
-   theIwb.Dilate(seIdxRect9x5);
-   theIwb.copyResultToHost(imgOut);
-   imgOut.writeFile("Workbench4_D9x5.txt");
-
-   // Erode with circle
-   cout << "Erode with 11x11 circle" << endl;
-   theIwb.Erode(seIdxCircle11);
-   theIwb.copyResultToHost(imgOut);
-   imgOut.writeFile("Workbench4_ECirc.txt");
-
-   cout << endl << "Checking device memory usage: " << endl;
+   cout << endl << "Checking device memory usage so far: " << endl;
    cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
 
    /*
+   cout << "Now create a chunky image and try thinning
    // Try a thinning sweep on the dilated image (8 findandremove ops) 
    theIwb.ThinningSweep();
-   theIwb.copyResultToHost(imgOut);
+   theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench5_ThinSw1.txt");
 
    // Again...
@@ -446,19 +452,19 @@ void runWorkbenchUnitTests(void)
    theIwb.ThinningSweep();
    theIwb.ThinningSweep();
    theIwb.ThinningSweep();
-   theIwb.copyResultToHost(imgOut);
+   theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench6_ThinSw5.txt");
 
    // And again...
    for(int i=0; i<95; i++)
       theIwb.ThinningSweep();
-   theIwb.copyResultToHost(imgOut);
+   theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench7_ThinSw100.txt");
-   */
 
    cout << "After 100 image ops, check memory usage" << endl;
    // Check to see how much device memory we're using right now
    cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+   */
 
    cout << "Finished IWB testing!" << endl;
    cout << "****************************************";

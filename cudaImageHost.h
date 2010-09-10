@@ -50,7 +50,7 @@ public:
    void readFile(string filename, int ncols, int nrows);
    void writeFile(string filename) const;
    void printImage(void) const;
-   void printMask(char zero='.', char one='0') const;
+   void printMask(char zero='.', char one='H') const; // 'H' for "Host"
 
    int* getDataPtr(void)  const {return imgData_;}
    int  numCols(void)     const {return imgCols_;}

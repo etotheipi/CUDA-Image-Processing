@@ -212,15 +212,13 @@ public:
    static int addStructElt(int* hostSE, int ncols, int nrows);
    static int addStructElt(cudaImageHost const & seHost);
 
-   // This method is used to push the current output of the workbench to host
-   void copyResultToHost  (cudaImageHost   & hostOut) const;
-   void copyResultToDevice(cudaImageDevice & hostOut) const;
-
    // This method is used to push/pull data to/from external locations
    void copyBufferToHost  ( int buf, cudaImageHost   & hostOut) const;
    void copyBufferToDevice( int buf, cudaImageDevice & hostOut) const;
-   void copyHostToBuffer  ( cudaImageHost   const & hostIn, int buf);
-   void copyDeviceToBuffer( cudaImageDevice const & hostIn, int buf);
+   void copyBufferToHost  ( cudaImageHost   & hostOut) const;
+   void copyBufferToDevice( cudaImageDevice & hostOut) const;
+   void copyHostToBuffer  ( cudaImageHost   const & hostIn, int buf=A);
+   void copyDeviceToBuffer( cudaImageDevice const & hostIn, int buf=A);
 
    // GPU Kernel geometry
    void setBlockSize1D(int nthreads);
