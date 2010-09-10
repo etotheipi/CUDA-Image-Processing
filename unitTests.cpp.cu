@@ -65,12 +65,16 @@ int main( int argc, char** argv)
    // it here.  Comment it out if desired.
    runCudaImageUnitTests();
 
-   runMorphologyUnitTests();
+   //runMorphologyUnitTests();
+
+   runWorkbenchUnitTests();
 
    cudaThreadExit();
 }
 
-/////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 // Query the devices on the system and select the fastest (or override the
 // selectedDevice variable to choose your own
 int runDevicePropertiesQuery(void)
@@ -121,6 +125,9 @@ int runDevicePropertiesQuery(void)
    return selectedDevice;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 void runCudaImageUnitTests(void)
 {
    cout << endl;
@@ -235,8 +242,7 @@ void runConvolutionUnitTests(void)
 ////////////////////////////////////////////////////////////////////////////////
 void runMorphologyUnitTests()
 {
-
-   cout << endl << "Executing morphology unit tests..." << endl;
+   cout << endl << "Executing morphology unit tests (no workbench)..." << endl;
 
    /////////////////////////////////////////////////////////////////////////////
    // Allocate host memory and read in the test image from file
@@ -267,9 +273,9 @@ void runMorphologyUnitTests()
 
    // Display the two SEs
    cout << "Using the unique, 17x17 structuring element:" << endl;
-   se17.printImage();
+   se17.printMask('.','0');
    cout << "Other tests using basic circular SE:" << endl;
-   seCirc.printImage();
+   seCirc.printMask('.','0');
 
    // Allocate Device Memory
    cudaImageDevice devIn(imgIn);
@@ -324,123 +330,138 @@ void runMorphologyUnitTests()
 }
 
 
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 void runWorkbenchUnitTests(void)
 {
-   /*
-   /////////////////////////////////////////////////////////////////////////////
-   // Allocate host memory and read in the test image from file
-   /////////////////////////////////////////////////////////////////////////////
-   unsigned int imgW  = 256;
-   unsigned int imgH  = 256;
-   unsigned int nPix  = imgH*imgW;
-   unsigned int imgBytes = nPix*INT_SZ;
-   int* imgIn  = (int*)malloc(imgBytes);
-   int* imgOut = (int*)malloc(imgBytes);
-   string fn("salt256.txt");
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << "***Testing ImageWorkbench basic operations" << endl << endl;
 
-   cout << endl;
-   printf("\nTesting morphology operations on %dx%d mask.\n", imgW,imgH);
-   cout << "Reading mask from " << fn.c_str() << endl;
-   ReadFile(fn, imgIn, imgW, imgH);
+   // Read the salt image from file
+   cudaImageHost imgIn("salt256.txt", 256, 256);
+   imgIn.printMask();
+
+   // Create a place to put the result
+   cudaImageHost imgOut(64, 64);
+
+   // A very unique SE for checking coordinate systems
+   cudaImageHost se17("asymmPSF_17x17.txt", 17, 17);
+
+   // Circular SE from utilities file
+   int seCircD = 11;
+   cudaImageHost seCirc(seCircD, seCircD);
+   createBinaryCircle(seCirc.getDataPtr(), seCircD);
+
+   // Check that rectangular SEs work, too
+   int rectW = 9;
+   int rectH = 5;
+   cudaImageHost seRect(rectW, rectH);
+   for(int r=0; r<rectH; r++)
+      for(int c=0; c<rectW; c++)
+         seRect(c, r) = 1;
 
 
+   // The SEs are added to the static, master SE list in ImageWorkbench, and
+   // are used by giving the index into that list (returned by addStructElt())
+   cout << "Adding unique SE to list" << endl;
+   se17.printMask();
+   int seIdxUnique17 = ImageWorkbench::addStructElt(se17);
 
-   /////////////////////////////////////////////////////////////////////////////
-   // Create a bunch of structuring elements to test
-   //
-   // All the important 3x3 SEs are "hardcoded" into dedicated functions 
-   // See all the CREATE_3X3_MORPH_KERNEL/CREATE_IWB_3X3_FUNCTION calls in .cu
-   /////////////////////////////////////////////////////////////////////////////
-   // A very unique 17x17 to test coord systems
-   int  se17W = 17;
-   int  se17H = 17;
-   int  se17Pixels = se17W*se17H;
-   int  se17Bytes = se17Pixels * INT_SZ;
-   int* se17 = (int*)malloc(se17Bytes);
-   ReadFile("asymmPSF_17x17.txt",   se17,  se17W,  se17H);
+   cout << "Adding circular SE to list" << endl;
+   seCirc.printMask();
+   int seIdxCircle11 = ImageWorkbench::addStructElt(seCirc);
 
-   // Test a rectangular SE
-   int  seRectW = 9;
-   int  seRectH = 5;
-   int  seRectPixels = seRectW*seRectH;
-   int  seRectBytes  = seRectPixels * INT_SZ;
-   int* seRect = (int*)malloc(seRectBytes);
-   for(int i=0; i<seRectPixels; i++)
-      seRect[i] = 1;
-
-   // Also test a circle
-   int  seCircD = 11; // D~Diameter
-   int  seCircPixels = seCircD*seCircD;
-   int  seCircBytes = seCircPixels*INT_SZ;
-   int* seCirc = (int*)malloc(seCircBytes);
-   int  seCircNZ = createBinaryCircle(seCirc, seCircD); // return #non-zero
-
-   // Add the structuring elements to the master SE list, which copies 
-   // them into device memory.  Note that you need separate SEs for
-   // erosion and dilation, even if they are the same img-data (target
-   // sum is different)
-   //int seIdxUnique17x17  = ImageWorkbench::addStructElt(se17,   se17W,   se17H  );
-   //int seIdxRect9x5      = ImageWorkbench::addStructElt(seRect, seRectW, seRectH);
-   //int seIdxCircle11x11  = ImageWorkbench::addStructElt(seCirc, seCircD, seCircD);
-   int seIdxUnique17x17 = 0;
-   int seIdxRect9x5     = 0;
-   int seIdxCircle11x11 = 0;
+   cout << "Adding rectangular SE to list" << endl;
+   seRect.printMask();
+   int seIdxRect9x5  = ImageWorkbench::addStructElt(seRect);
    
+   cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+
 
    /////////////////////////////////////////////////////////////////////////////
    // Let's start testing ImageWorkbench
    /////////////////////////////////////////////////////////////////////////////
-
    // Create the workbench, which copies the image into device memory
-   ImageWorkbench theIwb(imgIn, imgW, imgH);
-
-   dim3 bsize = theIwb.getBlockSize();
-   dim3 gsize = theIwb.getGridSize();
-   printf("Using the following kernel geometry for morphology operations:\n");
-   printf("\tBlock Size = (%d, %d, %d) threads\n", bsize.x, bsize.y, bsize.z);
-   printf("\tGrid Size  = (%d, %d, %d) blocks\n ", gsize.x, gsize.y, gsize.z);
+   ImageWorkbench theIwb(imgIn);
 
    // Start by simply fetching the unmodified image (sanity check)
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image1_Orig.txt", imgOut, imgW, imgH);
+   cout << "Copying unaltered image back to host for verification" << endl;
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench1_In.txt");
    
-   // Dilate by the 17x17
-   theIwb.Dilate(seIdxUnique17x17);
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image2_Dilate17.txt", imgOut, imgW, imgH);
+   // Dilate by the circle
+   cout << "Dilating with 11x11 circle" << endl;
+   theIwb.Dilate(seIdxCircle11);
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench2_DilateCirc.txt");
 
-   // We Erode the image now, which means it's actually been "closed"
-   theIwb.Erode(seIdxUnique17x17);
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image3_Close17.txt", imgOut, imgW, imgH);
+   // We Erode the image now, but with the basic 3x3
+   cout << "Performing simple 3x3 erode" << endl;
+   theIwb.Erode();
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench3_Erode3.txt");
+
+   // We now test subtract by eroding an image w/ 3x3 and subtracting from original
+   // Anytime we manually select src/dst for image operations, make sure we end up
+   // with the final result in buffer A, or in buffer B with a a call to flipBuffers()
+   // to make sure that our input/output locations are consistent
+   cout << "Dilate before testing subtraction" << endl;
+   theIwb.Dilate();
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench3a_Subtract.txt");
+
+   cout << "Erode to get second operand of subtraction" << endl;
+   theIwb.Erode(A, 1);
+
+   cout << "Subtract the eroded image from the dilated image" << endl;
+   theIwb.Subtract(1, A, A);
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench3b_Subtract.txt");
 
    // Dilate with rectangle
+   cout << "Rectangular dilate" << endl;
    theIwb.Dilate(seIdxRect9x5);
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image4_DilateRect.txt", imgOut, imgW, imgH);
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench4_D9x5.txt");
 
+   // Erode with circle
+   cout << "Erode with 11x11 circle" << endl;
+   theIwb.Erode(seIdxCircle11);
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench4_ECirc.txt");
+
+   cout << endl << "Checking device memory usage: " << endl;
+   cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+
+   /*
    // Try a thinning sweep on the dilated image (8 findandremove ops) 
    theIwb.ThinningSweep();
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image6_ThinSw1.txt", imgOut, imgW, imgH);
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench5_ThinSw1.txt");
 
    // Again...
    theIwb.ThinningSweep();
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image7_ThinSw2.txt", imgOut, imgW, imgH);
+   theIwb.ThinningSweep();
+   theIwb.ThinningSweep();
+   theIwb.ThinningSweep();
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench6_ThinSw5.txt");
 
    // And again...
-   theIwb.ThinningSweep();
-   theIwb.fetchResult(imgOut);
-   WriteFile("Image8_ThinSw3.txt", imgOut, imgW, imgH);
-
-   // Check to see how much device memory we're using right now
-   ImageWorkbench::calculateDeviceMemUsage(true);  // printToStdOut==true
-
-   free(imgIn);
-   free(imgOut);
-   free(se17);
-   free(seRect);
-   free(seCirc);
+   for(int i=0; i<95; i++)
+      theIwb.ThinningSweep();
+   theIwb.copyResultToHost(imgOut);
+   imgOut.writeFile("Workbench7_ThinSw100.txt");
    */
+
+   cout << "After 100 image ops, check memory usage" << endl;
+   // Check to see how much device memory we're using right now
+   cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+
+   cout << "Finished IWB testing!" << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+
 }

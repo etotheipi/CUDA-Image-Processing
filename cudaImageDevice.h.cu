@@ -53,6 +53,9 @@ public:
    void copyToDevice    (int* devicePtr) const;
    void copyToDevice    (cudaImageDevice & deviceImg) const;
 
+   
+   // Should only be used for images of zeros and ones
+   void printMask(char zero='.', char one='X');
 
    // Implicit cast to int* for functions that require int*
    operator int*() { return imgData_;}

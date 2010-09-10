@@ -11,8 +11,8 @@
 #include "cudaImageHost.h"
 #include "cudaImageDevice.h.cu"
 
-#define A 0
-#define B 1
+#define A -1000
+#define B -1001
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -27,14 +27,11 @@
 ////////////////////////////////////////////////////////////////////////////////
 #define CREATE_3X3_WORKBENCH_METHOD( name )   \
    public: \
-   void name( BUF_TYPE srcType,  \
-              int      srcIdx,   \
-              BUF_TYPE dstType,  \
-              int      dstIdx )  \
+   void name( int srcBuf,  int dstBuf )  \
    {  \
       /* User can only access PRIMARY and EXTRA buffers, not TEMP*/ \
-      int* srcPtr = getBufPtrAny(srcType, srcIdx, false)->getDataPtr(); \
-      int* dstPtr = getBufPtrAny(dstType, dstIdx, false)->getDataPtr(); \
+      int* srcPtr = getBufPtrAny(srcBuf, false)->getDataPtr(); \
+      int* dstPtr = getBufPtrAny(dstBuf, false)->getDataPtr(); \
       Morph3x3_##name##_Kernel<<<GRID_2D_,BLOCK_2D_>>>(  \
                         srcPtr,    \
                         dstPtr,    \
@@ -43,19 +40,16 @@
    } \
    void name( ) \
    {  \
-      name( BUF_PRIMARY, A, BUF_PRIMARY, B); \
+      name( A, B ); \
       flipBuffers(); \
    } \
    \
    private: \
-   void Z##name( BUF_TYPE srcType,  \
-                 int      srcIdx,   \
-                 BUF_TYPE dstType,  \
-                 int      dstIdx )  \
+   void Z##name( int srcBuf, int dstBuf ) \
    {  \
       /* ZFunctions can access TEMP buffers too */ \
-      int* srcPtr = getBufPtrAny(srcType, srcIdx, true)->getDataPtr(); \
-      int* dstPtr = getBufPtrAny(dstType, dstIdx, true)->getDataPtr(); \
+      int* srcPtr = getBufPtrAny(srcBuf, true)->getDataPtr(); \
+      int* dstPtr = getBufPtrAny(dstBuf, true)->getDataPtr(); \
       Morph3x3_##name##_Kernel<<<GRID_2D_,BLOCK_2D_>>>( \
                         srcPtr,    \
                         dstPtr,    \
@@ -70,31 +64,25 @@
 ////////////////////////////////////////////////////////////////////////////////
 #define CREATE_MASK_UNARY_OP_WORKBENCH_METHOD( name )   \
    public: \
-   void name( BUF_TYPE srcType, \
-              int      srcIdx,  \
-              BUF_TYPE dstType, \
-              int      dstIdx ) \
+   void name( int srcBuf, int dstBuf ) \
    {  \
       /* User can only access PRIMARY and EXTRA buffers, not TEMP*/ \
-      int* srcPtr = getBufPtrAny(srcType, srcIdx, false)->getDataPtr(); \
-      int* dstPtr = getBufPtrAny(dstType, dstIdx, false)->getDataPtr(); \
+      int* srcPtr = getBufPtrAny(srcBuf, false)->getDataPtr(); \
+      int* dstPtr = getBufPtrAny(dstBuf, false)->getDataPtr(); \
       Mask_##name##_Kernel<<<GRID_1D_,BLOCK_1D_>>>( srcPtr, dstPtr );  \
    } \
    void name( ) \
    {  \
-      name( BUF_PRIMARY, A, BUF_PRIMARY, B); \
+      name( A, B ); \
       flipBuffers(); \
    } \
    \
    private: \
-   void Z##name( BUF_TYPE srcType,  \
-                 int      srcIdx,   \
-                 BUF_TYPE dstType,  \
-                 int      dstIdx ) \
+   void Z##name( int srcBuf, int dstBuf ) \
    {  \
       /* ZFunctions can access TEMP buffers too */ \
-      int* srcPtr = getBufPtrAny(srcType, srcIdx, true)->getDataPtr(); \
-      int* dstPtr = getBufPtrAny(dstType, dstIdx, true)->getDataPtr(); \
+      int* srcPtr = getBufPtrAny(srcBuf, true)->getDataPtr(); \
+      int* dstPtr = getBufPtrAny(dstBuf, true)->getDataPtr(); \
       Mask_##name##_Kernel<<<GRID_1D_,BLOCK_1D_>>>( srcPtr, dstPtr); \
    } \
 
@@ -106,39 +94,28 @@
 ////////////////////////////////////////////////////////////////////////////////
 #define CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( name )   \
    public: \
-   void name( BUF_TYPE src2Type,  \
-              int      src2Idx,   \
-              BUF_TYPE src1Type,  \
-              int      src1Idx,   \
-              BUF_TYPE dstType,   \
-              int      dstIdx)    \
+   void name( int src2Buf, int src1Buf, int dstBuf ) \
    {  \
       /* User can only access PRIMARY and EXTRA buffers, not TEMP*/ \
-      int* src1Ptr = getBufPtrAny(src1Type, src1Idx, false)->getDataPtr();  \
-      int* src2Ptr = getBufPtrAny(src2Type, src2Idx, false)->getDataPtr();  \
-      int* dstPtr  = getBufPtrAny(dstType,  dstIdx,  false)->getDataPtr();  \
+      int* src1Ptr = getBufPtrAny(src1Buf, false)->getDataPtr();  \
+      int* src2Ptr = getBufPtrAny(src2Buf, false)->getDataPtr();  \
+      int* dstPtr  = getBufPtrAny(dstBuf,  false)->getDataPtr();  \
       Mask_##name##_Kernel<<<GRID_1D_,BLOCK_1D_>>>( src1Ptr, src2Ptr, dstPtr );\
    } \
    \
-   void name( BUF_TYPE src2Type,  \
-              int      src2Idx )  \
+   void name( int src2Buf )  \
    {  \
-      name( BUF_PRIMARY, A, src2Type, src2Idx, BUF_PRIMARY, B); \
+      name( A, src2Buf, B); \
       flipBuffers(); \
    } \
    \
    private: \
-   void Z##name( BUF_TYPE src2Type,  \
-                 int      src2Idx,   \
-                 BUF_TYPE src1Type,  \
-                 int      src1Idx,   \
-                 BUF_TYPE dstType,   \
-                 int      dstIdx)    \
+   void Z##name( int src2Buf, int src1Buf, int dstBuf ) \
    {  \
       /* ZFunctions can access any buffers, including TEMP */ \
-      int* src1Ptr = getBufPtrAny(src1Type, src1Idx, true)->getDataPtr();  \
-      int* src2Ptr = getBufPtrAny(src2Type, src2Idx, true)->getDataPtr();  \
-      int* dstPtr  = getBufPtrAny(dstType,  dstIdx,  true)->getDataPtr();  \
+      int* src1Ptr = getBufPtrAny(src1Buf, true)->getDataPtr();  \
+      int* src2Ptr = getBufPtrAny(src2Buf, true)->getDataPtr();  \
+      int* dstPtr  = getBufPtrAny(dstBuf,  true)->getDataPtr();  \
       Mask_##name##_Kernel<<<GRID_1D_,BLOCK_1D_>>>( src1Ptr, src2Ptr, dstPtr );\
    } \
 
@@ -173,12 +150,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-typedef enum
-{
-   BUF_PRIMARY,
-   BUF_EXTRA,
-   BUF_TEMP
-}  BUF_TYPE;
 
 
 class ImageWorkbench
@@ -223,7 +194,7 @@ private:
    void deleteTempBuffer(void);
 
    // This method can get any buffer, PRIMARY, EXTRA or TEMP
-   cudaImageDevice* getBufPtrAny(BUF_TYPE type, int idx, bool allowTemp=false);
+   cudaImageDevice* getBufPtrAny(int idx, bool allowTemp=false);
 
    // All operations that don't specify src/dst will call this at the end
    // It switches bufA and bufB so that the next operation will use the 
@@ -235,7 +206,7 @@ public:
    // Primary constructor
    void Initialize(cudaImageHost const & hostImg);
    ImageWorkbench();
-   ImageWorkbench(cudaImageHost const & hostImg) { Initialize(hostImg); }
+   ImageWorkbench(cudaImageHost const & hostImg);
 
    // IWB maintains a static list of all SEs, and we access them by index
    static int addStructElt(int* hostSE, int ncols, int nrows);
@@ -246,10 +217,10 @@ public:
    void copyResultToDevice(cudaImageDevice & hostOut) const;
 
    // This method is used to push/pull data to/from external locations
-   void copyBufferToHost  ( BUF_TYPE bt, int idx, cudaImageHost   & hostOut) const;
-   void copyBufferToDevice( BUF_TYPE bt, int idx, cudaImageDevice & hostOut) const;
-   void copyHostToBuffer  ( cudaImageHost   const & hostIn, BUF_TYPE bt, int idx);
-   void copyDeviceToBuffer( cudaImageDevice const & hostIn, BUF_TYPE bt, int idx);
+   void copyBufferToHost  ( int buf, cudaImageHost   & hostOut) const;
+   void copyBufferToDevice( int buf, cudaImageDevice & hostOut) const;
+   void copyHostToBuffer  ( cudaImageHost   const & hostIn, int buf);
+   void copyDeviceToBuffer( cudaImageDevice const & hostIn, int buf);
 
    // GPU Kernel geometry
    void setBlockSize1D(int nthreads);
@@ -262,7 +233,7 @@ public:
 
    // This function can be used to access buffers directly, to copy data in 
    // or out of the workbench.  User can only access PRIMARY and EXTRA buffers
-   cudaImageDevice* getBufferPtr(BUF_TYPE t, int idx);
+   cudaImageDevice* getBufferPtr(int bufIdx);
 
 
    
@@ -275,48 +246,35 @@ public:
    // after the last SUB-operation, and then the user has no way to 
    // determine if the image changed
    void GenericMorphOp(int seIndex, int targSum)
-      { GenericMorphOp(seIndex, targSum, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { GenericMorphOp(seIndex, targSum, A, B); flipBuffers(); }
    void HitOrMiss(int seIndex)
-      { HitOrMiss(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { HitOrMiss(seIndex, A, B); flipBuffers(); }
    void Erode(int seIndex)
-      { Erode(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { Erode(seIndex, A, B); flipBuffers(); }
    void Dilate(int seIndex)
-      { Dilate(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+   { 
+      Dilate(seIndex, A, B); 
+      flipBuffers(); 
+   }
    void Median(int seIndex)
-      { Median(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { Median(seIndex, A, B); flipBuffers(); }
    void Open(int seIndex)
-      { Open(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { Open(seIndex, A, B); flipBuffers(); }
    void Close(int seIndex)
-      { Close(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { Close(seIndex, A, B); flipBuffers(); }
    void FindAndRemove(int seIndex)
-      { FindAndRemove(seIndex, BUF_PRIMARY, A, BUF_PRIMARY, B); flipBuffers(); }
+      { FindAndRemove(seIndex, A, B); flipBuffers(); }
 
    /////////////////////////////////////////////////////////////////////////////
    // Same morphological operators, but with customized src, dst
-   void GenericMorphOp(int seIndex, int targSum, 
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void HitOrMiss(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void Erode(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void Dilate(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void Median(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void Open(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void Close(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void FindAndRemove(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
+   void GenericMorphOp( int seIndex, int targSum, int srcBuf, int dstBuf);
+   void HitOrMiss(      int seIndex, int srcBuf, int dstBuf);
+   void Erode(          int seIndex, int srcBuf, int dstBuf);
+   void Dilate(         int seIndex, int srcBuf, int dstBuf);
+   void Median(         int seIndex, int srcBuf, int dstBuf);
+   void Open(           int seIndex, int srcBuf, int dstBuf);
+   void Close(          int seIndex, int srcBuf, int dstBuf);
+   void FindAndRemove(  int seIndex, int srcBuf, int dstBuf);
    // CPU wrappers for the mask op kernel functions which we need frequently
    //int  NumPixelsChanged(void);
    //int  SumMask(void);
@@ -409,30 +367,14 @@ private:
    // So we use ZFunctions for things like open, close, thinsweep, etc,
    // so that BufA and BufB can be compared and we won't just be comparing
    // the last sub-operation in the batch
-   void ZGenericMorphOp(int seIndex, int targSum, 
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZHitOrMiss(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZErode(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZDilate(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZMedian(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZOpen(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZClose(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
-   void ZFindAndRemove(int seIndex,
-                              BUF_TYPE srctype, int srcidx,
-                              BUF_TYPE dsttype, int dstidx);
+   void ZGenericMorphOp( int seIndex, int targSum,  int srcBuf, int dstBuf);
+   void ZHitOrMiss(      int seIndex, int srcBuf, int dstBuf);
+   void ZErode(          int seIndex, int srcBuf, int dstBuf);
+   void ZDilate(         int seIndex, int srcBuf, int dstBuf);
+   void ZMedian(         int seIndex, int srcBuf, int dstBuf);
+   void ZOpen(           int seIndex, int srcBuf, int dstBuf);
+   void ZClose(          int seIndex, int srcBuf, int dstBuf);
+   void ZFindAndRemove(  int seIndex, int srcBuf, int dstBuf);
 
 };
 

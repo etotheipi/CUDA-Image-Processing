@@ -75,20 +75,23 @@ cudaImageDevice::cudaImageDevice() :
    imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0) { }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageDevice::cudaImageDevice(int ncols, int nrows)
+cudaImageDevice::cudaImageDevice(int ncols, int nrows) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    Allocate(ncols, nrows);
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageDevice::cudaImageDevice(cudaImageHost const & hostImg)
+cudaImageDevice::cudaImageDevice(cudaImageHost const & hostImg) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    copyFromHost(hostImg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageDevice::cudaImageDevice(cudaImageDevice const & devImg)
+cudaImageDevice::cudaImageDevice(cudaImageDevice const & devImg) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    copyFromDevice(devImg);
 }
@@ -212,6 +215,12 @@ int cudaImageDevice::calculateDeviceMemoryUsage(bool dispStdout)
    return totalDevMemUsed_;
 }
 
+void cudaImageDevice::printMask(char zero, char one)
+{
+   cudaImageHost hptr;
+   copyToHost(hptr);
+   hptr.printMask(zero, one);
+}
 
 
 

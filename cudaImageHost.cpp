@@ -56,36 +56,36 @@ cudaImageHost::~cudaImageHost()
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageHost::cudaImageHost() :
-   imgData_(NULL),
-   imgCols_(0),
-   imgRows_(0),
-   imgElts_(0),
-   imgBytes_(0) { }
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0) { }
 
 
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(int ncols, int nrows)
+cudaImageHost::cudaImageHost(int ncols, int nrows) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    Allocate(ncols, nrows);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(int* data, int ncols, int nrows)
+cudaImageHost::cudaImageHost(int* data, int ncols, int nrows) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    Allocate(ncols, nrows);    
    MemcpyIn(data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(string filename, int ncols, int nrows)
+cudaImageHost::cudaImageHost(string filename, int ncols, int nrows) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    Allocate(ncols, nrows);
    readFile(filename, ncols, nrows);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(cudaImageHost const & i2)
+cudaImageHost::cudaImageHost(cudaImageHost const & i2) :
+   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
 {
    Allocate(i2.imgCols_, i2.imgRows_);
    MemcpyIn(i2.imgData_);
@@ -141,19 +141,34 @@ void cudaImageHost::writeFile(string filename) const
 
 
 ////////////////////////////////////////////////////////////////////////////////
+void cudaImageHost::printMask(char zero, char one) const
+{
+   for(int r=0; r<imgRows_; r++)
+   {
+      for(int c=0; c<imgCols_; c++)
+      {
+         int val = imgData_[c*imgRows_+r];
+         if(val == 0)
+            cout << zero;
+         else
+            cout << one;
+         cout << " ";
+      }
+      cout << endl;
+   }
+}
+
+////////////////////////////////////////////////////////////////////////////////
 void cudaImageHost::printImage(void) const
 {
    for(int r=0; r<imgRows_; r++)
    {
       for(int c=0; c<imgCols_; c++)
-         cout << imgData_[c*imgRows_+r] << " ";
+      {
+         cout << imgData_[c*imgRows_+r] << endl;
+      }
       cout << endl;
    }
 }
-
-
-
-
-
 
 
