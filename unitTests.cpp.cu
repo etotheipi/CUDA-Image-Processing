@@ -65,7 +65,7 @@ int main( int argc, char** argv)
    // it here.  Comment it out if desired.
    runCudaImageUnitTests();
 
-   //runMorphologyUnitTests();
+   runMorphologyUnitTests();
 
    runWorkbenchUnitTests();
 
@@ -440,31 +440,100 @@ void runWorkbenchUnitTests(void)
    cout << endl << "Checking device memory usage so far: " << endl;
    cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
 
-   /*
-   cout << "Now create a chunky image and try thinning
-   // Try a thinning sweep on the dilated image (8 findandremove ops) 
-   theIwb.ThinningSweep();
-   theIwb.copyBufferToHost(imgOut);
-   imgOut.writeFile("Workbench5_ThinSw1.txt");
+   /////////////////////////////////////////////////////////////////////////////
+   /////////////////////////////////////////////////////////////////////////////
+   /////////////////////////////////////////////////////////////////////////////
+   // With a working workbench, we can finally SOLVE A MAZE !!
+   cout << endl << "Time to solve a maze! " << endl << endl;
+   cudaImageHost mazeImg("maze512.txt", 512, 512);
+   ImageWorkbench iwbMaze(mazeImg);
 
-   // Again...
-   theIwb.ThinningSweep();
-   theIwb.ThinningSweep();
-   theIwb.ThinningSweep();
-   theIwb.ThinningSweep();
-   theIwb.copyBufferToHost(imgOut);
-   imgOut.writeFile("Workbench6_ThinSw5.txt");
+   // Write the original maze to file
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze1_In.txt");
+
+   // Start thinning
+   cout << "Thinning sweep 1" << endl;
+   iwbMaze.ThinningSweep();
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze2_Thin.txt");
+
+   
+   // Start thinning
+   cout << "Thinning sweep 2-4" << endl;
+   for(int i=0; i<3; i++)
+      iwbMaze.ThinningSweep();
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze3_Thin4.txt");
+
+   cout << "Thinning sweep 5-10" << endl;
+   for(int i=0; i<6; i++)
+      iwbMaze.ThinningSweep();
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze4_Thin10.txt");
+
+   // More thinning
+   cout << "Pruning sweep 1-5" << endl;
+   iwbMaze.PruningSweep();
+   iwbMaze.PruningSweep();
+   iwbMaze.PruningSweep();
+   iwbMaze.PruningSweep();
+   iwbMaze.PruningSweep();
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze5_Prune5.txt");
 
    // And again...
-   for(int i=0; i<95; i++)
-      theIwb.ThinningSweep();
-   theIwb.copyBufferToHost(imgOut);
-   imgOut.writeFile("Workbench7_ThinSw100.txt");
+   cout << "100 sweeps, PPPPT" << endl;
+   for(int i=0; i<20; i++)
+   {
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.ThinningSweep();
+   }
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze6_Prune100.txt");
 
-   cout << "After 100 image ops, check memory usage" << endl;
+   cout << "Pruning sweep 101-1000, 9P 1T" << endl;
+   for(int i=0; i<90; i++)
+   {
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.PruningSweep();
+      iwbMaze.ThinningSweep();
+   }
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze7_Prune1000.txt");
+
+   cout << "Pruning sweep 1000 more, 50P 1T" << endl;
+   for(int i=0; i<20; i++)
+   {
+      for(int j=0; j<50; j++)
+         iwbMaze.PruningSweep();
+      iwbMaze.ThinningSweep();
+   }
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze8_Prune2000.txt");
+
+   cout << "Pruning sweep 5000 more, 50P 1T" << endl;
+   for(int i=0; i<100; i++)
+   {
+      for(int j=0; j<50; j++)
+         iwbMaze.PruningSweep();
+      iwbMaze.ThinningSweep();
+   }
+   iwbMaze.copyBufferToHost(imgOut);
+   imgOut.writeFile("Maze9_Prune10000.txt");
+
    // Check to see how much device memory we're using right now
    cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
-   */
 
    cout << "Finished IWB testing!" << endl;
    cout << "****************************************";
