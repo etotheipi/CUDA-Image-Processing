@@ -172,3 +172,17 @@ void cudaImageHost::printImage(void) const
 }
 
 
+// This is the dumbest, simplest algorithm I could come up with.  There are most
+// definitely more efficient way to implement it.  I just want an to get an
+// order-of-magnitude timing
+void cudaImageHost::Dilate(cudaImageHost SE, cudaImageHost & target)
+{
+   int seW = SE.numCols();
+   int seH = SE.numRows();
+
+   int imgW = imgCols_;
+   int imgH = imgRows_;
+
+   target.resize(imgW, imgH);
+
+}

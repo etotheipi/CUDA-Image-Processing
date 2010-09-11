@@ -177,10 +177,17 @@ private:
    cudaImageDevice* bufferPtrA_;
    cudaImageDevice* bufferPtrB_;
 
-   // We need to be able to allocate extra buffers for user to utilize, and
-   // temporary buffers for various batch operations to use
+   // The user should be to be able to allocate extra buffers 
    vector<cudaImageDevice> extraBuffers_;
+
+   // Temporary buffers will be needed to carry our internal operations
    vector<cudaImageDevice> tempBuffers_;
+
+   // We need to have locking, though, so that nested internal operations
+   // don't overwrite buffers that are in use by the calling method
+   vector<bool> tempBuffersLockFlag_;
+   int  getTempBuffer(void);
+   void releaseTempBuffer(int bufIdx);
 
    // Keep a master list of SEs and non-zero counts
    static vector<cudaImageDevice> masterListSE_;
@@ -194,7 +201,7 @@ private:
    void deleteTempBuffer(void);
 
    // This method can get any buffer, PRIMARY, EXTRA or TEMP
-   cudaImageDevice* getBufPtrAny(int idx, bool allowTemp=false);
+   cudaImageDevice* getBufPtrAny(int idx, bool allowTemp=true);
 
    // All operations that don't specify src/dst will call this at the end
    // It switches bufA and bufB so that the next operation will use the 
@@ -211,6 +218,8 @@ public:
    // IWB maintains a static list of all SEs, and we access them by index
    static int addStructElt(int* hostSE, int ncols, int nrows);
    static int addStructElt(cudaImageHost const & seHost);
+
+   static cudaImageDevice const * getStructEltPtr(int i) {return &masterListSE_[i];}
 
    // This method is used to push/pull data to/from external locations
    void copyBufferToHost  ( int buf, cudaImageHost   & hostOut) const;
@@ -250,10 +259,7 @@ public:
    void Erode(int seIndex)
       { Erode(seIndex, A, B); flipBuffers(); }
    void Dilate(int seIndex)
-   { 
-      Dilate(seIndex, A, B); 
-      flipBuffers(); 
-   }
+      { Dilate(seIndex, A, B); flipBuffers(); }
    void Median(int seIndex)
       { Median(seIndex, A, B); flipBuffers(); }
    void Open(int seIndex)
@@ -273,9 +279,10 @@ public:
    void Open(           int seIndex, int srcBuf, int dstBuf);
    void Close(          int seIndex, int srcBuf, int dstBuf);
    void FindAndRemove(  int seIndex, int srcBuf, int dstBuf);
-   // CPU wrappers for the mask op kernel functions which we need frequently
-   //int  NumPixelsChanged(void);
-   //int  SumMask(void);
+   void CopyBuffer(                  int dstBuf, int srcBuf);
+
+   int  SumImage(int srcBuf=A);
+   int  CountChanged(void);
 
    /////////////////////////////////////////////////////////////////////////////
    // Thinning is a sequence of 8 hit-or-miss operations which each find
@@ -335,7 +342,6 @@ public:
    CREATE_3X3_WORKBENCH_METHOD( Prune8 );
 
    CREATE_MASK_UNARY_OP_WORKBENCH_METHOD( Invert );
-   CREATE_MASK_UNARY_OP_WORKBENCH_METHOD( Copy   );
 
    // Order of arguments can be confusing for binary ops, use Subtract for example
    //
@@ -348,6 +354,7 @@ public:
    CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Union );
    CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Intersect );
    CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Subtract );
+   CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Different );
 
 
 private:
@@ -373,6 +380,10 @@ private:
    void ZOpen(           int seIndex, int srcBuf, int dstBuf);
    void ZClose(          int seIndex, int srcBuf, int dstBuf);
    void ZFindAndRemove(  int seIndex, int srcBuf, int dstBuf);
+
+   void ZCopyBuffer(int dstBuf, int srcBuf);
+   int  ZSumImage(int bufIdx);
+
 
 };
 

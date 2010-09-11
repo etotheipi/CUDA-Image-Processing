@@ -48,6 +48,7 @@ void runCudaImageUnitTests(void);
 void runConvolutionUnitTests(void);
 void runMorphologyUnitTests(void);
 void runWorkbenchUnitTests(void);
+void runTimingTests(void);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -61,13 +62,13 @@ int main( int argc, char** argv)
 {
    runDevicePropertiesQuery();
 
-   // This spits out a lot of data, but it is informative so I prefer to keep
-   // it here.  Comment it out if desired.
    runCudaImageUnitTests();
 
    runMorphologyUnitTests();
 
    runWorkbenchUnitTests();
+
+   runTimingTests();
 
    cudaThreadExit();
 }
@@ -202,30 +203,6 @@ void runCudaImageUnitTests(void)
 
    cout << endl << endl;
 
-   float gputime;
-
-   cout << "\tNow allocate a 4096x4096 image and move it around:" << endl;
-   gpuStartTimer();
-   cudaImageDevice deviceBigImg(4096,4096);
-   gputime = gpuStopTimer();
-   printf("\t\tAllocating 64MB in device memory took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
-
-   cudaImageHost hostBigImg(4096,4096);
-   gpuStartTimer();
-   deviceBigImg.copyFromHost(hostBigImg);
-   gputime = gpuStopTimer();
-   printf("\t\tCopying 64MB from HOST to DEVICE took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
-
-   gpuStartTimer();
-   deviceBigImg.copyToHost(hostBigImg);
-   gputime = gpuStopTimer();
-   printf("\t\tCopying 64MB from DEVICE to HOST took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
-
-   cudaImageDevice copyOfBigImg(4096, 4096);
-   gpuStartTimer();
-   deviceBigImg.copyToDevice(copyOfBigImg);
-   gputime = gpuStopTimer();
-   printf("\t\tCopying 64MB within DEVICE took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
 
    cout << "\tCheck current device memory usage:" << endl;
    cudaImageDevice::calculateDeviceMemoryUsage(true);
@@ -442,7 +419,6 @@ void runWorkbenchUnitTests(void)
 
    /////////////////////////////////////////////////////////////////////////////
    /////////////////////////////////////////////////////////////////////////////
-   /////////////////////////////////////////////////////////////////////////////
    // With a working workbench, we can finally SOLVE A MAZE !!
    cout << endl << "Time to solve a maze! " << endl << endl;
    cudaImageHost mazeImg("maze512.txt", 512, 512);
@@ -495,6 +471,10 @@ void runWorkbenchUnitTests(void)
    iwbMaze.copyBufferToHost(imgOut);
    imgOut.writeFile("Maze6_Prune100.txt");
 
+   // We comment out these three loops, because they do tens of thousands
+   // of morph ops, to solve a maze that is unnecessarily difficult.
+   // Do it once for proof of concept, then comment it out.
+   /*
    cout << "Pruning sweep 101-1000, 9P 1T" << endl;
    for(int i=0; i<90; i++)
    {
@@ -531,6 +511,7 @@ void runWorkbenchUnitTests(void)
    }
    iwbMaze.copyBufferToHost(imgOut);
    imgOut.writeFile("Maze9_Prune10000.txt");
+   */
 
    // Check to see how much device memory we're using right now
    cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
@@ -540,3 +521,263 @@ void runWorkbenchUnitTests(void)
    cout << "***************************************" << endl;
 
 }
+
+
+#define TIME(a) \
+do { \
+         \
+} while(0);
+
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+void runTimingTests(void)
+{
+   cout << endl << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << "***Executing timing tests..." << endl;
+
+   // Make sure all previous GPU ops are done
+   cudaThreadSynchronize();
+
+   // First measure simple allocations and copying of host/device memory
+
+   float gputime, cputime;
+
+   cout << "\tNow allocate a 4096x4096 images and move them around:" << endl;
+   gpuStartTimer();
+   cudaImageDevice deviceBigImg(4096,4096);
+   gputime = gpuStopTimer();
+   printf("\t\tAllocating 64MB in device memory took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
+
+   cpuStartTimer();
+   cudaImageHost hostBigImg(4096,4096);
+   cputime = cpuStopTimer();
+
+   gpuStartTimer();
+   deviceBigImg.copyFromHost(hostBigImg);
+   gputime = gpuStopTimer();
+   printf("\t\tCopying 64MB from HOST to DEVICE took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
+
+   gpuStartTimer();
+   deviceBigImg.copyToHost(hostBigImg);
+   gputime = gpuStopTimer();
+   printf("\t\tCopying 64MB from DEVICE to HOST took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
+
+   cudaImageDevice copyOfBigImg(4096, 4096);
+   gpuStartTimer();
+   deviceBigImg.copyToDevice(copyOfBigImg);
+   gputime = gpuStopTimer();
+   printf("\t\tCopying 64MB within DEVICE took %0.2f ms (%.0f MB/s)\n\n\n", gputime, 64000.0f/gputime);
+
+   
+   // We previously timed the host allocation but didn't report it
+   printf("\t\tAllocating 64MB in HOST memory took %0.2f ms (%.0f MB/s)\n", cputime, 64000.0f/cputime);
+
+   cudaImageHost moreHostData(4096,4096);
+   cpuStartTimer();
+   moreHostData = hostBigImg;
+   cputime = cpuStopTimer();
+   printf("\t\tCopying 64MB within HOST took %0.2f ms (%.0f MB/s)\n\n\n", cputime, 64000.0f/cputime);
+
+
+   // First we do elaborate timings on raw kernel functions using direct memory
+   // locations.  Then we will do the same thing with the workbench and see how 
+   // much overhead there is.  I expect there will be virtually no overhead, but
+   // I won't know til I test it.
+
+   cout << "Timing a variety of morphological median calculations..." << endl;
+   int NITER=5;
+
+   vector<cudaImageDevice> circ(8);
+   circ[0].copyFromHost(createBinaryCircle(3));
+   circ[1].copyFromHost(createBinaryCircle(5));
+   circ[2].copyFromHost(createBinaryCircle(7));
+   circ[3].copyFromHost(createBinaryCircle(9));
+   circ[4].copyFromHost(createBinaryCircle(11));
+   circ[5].copyFromHost(createBinaryCircle(13));
+   circ[6].copyFromHost(createBinaryCircle(15));
+   circ[7].copyFromHost(createBinaryCircle(17));
+
+   int testSizes[5] = {256, 512, 1024, 2048, 4096};
+   for(int test=0; test<5; test++)
+   {
+      int size = testSizes[test];
+      int sizesq = size*size;
+
+      dim3 BLOCK(32, 8, 1);
+      dim3 GRID(size/BLOCK.x, size/BLOCK.y, 1);
+
+      cudaImageHost   imgHost(size,size);
+      cudaImageDevice imgDeviceIn(size,size);
+      cudaImageDevice imgDeviceOut(size,size);
+      cudaImageDevice imgTemp1(size,size);
+      cudaImageDevice imgTemp2(size,size);
+
+      // Put some data in the host image for fun
+      for(int i=0; i<size*size; i++)
+         imgHost[i] = i%2;
+
+      imgDeviceIn.copyFromHost(imgHost);
+
+      // Remember, for this test, only pointers
+      int* devIn  = imgDeviceIn.getDataPtr();
+      int* devOut = imgDeviceOut.getDataPtr();
+      int* devTemp1 = imgTemp1.getDataPtr();
+      int* devTemp2 = imgTemp2.getDataPtr();
+
+      // First test optimized 3x3 kernels
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Morph3x3_Dilate_Kernel<<<GRID,BLOCK>>>(devIn, devOut, size, size);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tMorph %4dx%4d image with optimized 3x3:     (real ms, gpu ms, FPS) = (%.2f, %.2f, %.1f FPS)\n",
+            size, size, cputime, gputime, 1000.0/cputime);
+
+      for(int seIdx=0; seIdx<8; seIdx++)
+      {
+         int* se     = circ[seIdx].getDataPtr();
+         int  seDiam = circ[seIdx].numCols();
+         int  seRad  = seDiam / 2;
+
+         gpuStartTimer();
+         cpuStartTimer();
+         for(int i=0; i<NITER; i++)
+            Morph_Generic_Kernel<<<GRID,BLOCK>>>(devIn, devOut, size, size, se, seRad, seRad, 0);
+         cudaThreadSynchronize();
+         cputime = cpuStopTimer()/NITER;
+         gputime = gpuStopTimer()/NITER;
+      
+         printf("\tMorph %4dx%4d image with %2dx%2d struct elt:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n",
+               size, size, seDiam, seDiam, cputime, gputime, 1000.0/cputime);
+      }
+
+      // Now test the linear-array kernels
+      dim3 BLOCK1D(256, 1, 1);
+      dim3 GRID1D(sizesq/256, 1, 1);
+      dim3 GRID1Dhalf(sizesq/512, 1, 1);
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Mask_Union_Kernel<<<GRID1D,BLOCK1D>>>(devIn, devOut, devOut);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tMask UNION two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     size, size, cputime, gputime, 1000/cputime);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Mask_Intersect_Kernel<<<GRID1D,BLOCK1D>>>(devIn, devOut, devOut);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tMask INTERSECT two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     size, size, cputime, gputime, 1000/cputime);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Mask_Subtract_Kernel<<<GRID1D,BLOCK1D>>>(devIn, devOut, devOut);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tMask SUBTRACT two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     size, size, cputime, gputime, 1000/cputime);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Mask_Invert_Kernel<<<GRID1D,BLOCK1D>>>(devIn, devOut);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tMask INVERT a %4dx%4d image:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     size, size, cputime, gputime, 1000/cputime);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      int k;
+      for(int i=0; i<NITER; i++)
+         k = Image_Sum(devIn, devTemp1, devTemp2, sizesq);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tReduction SUM on a %4dx%4d image:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     size, size, cputime, gputime, 1000/cputime);
+      cout << "\tsum=" << k << endl;
+
+      cout << endl;
+      cudaImageDevice::calculateDeviceMemoryUsage(true);
+      cout << endl;
+
+   }
+   cout << endl << endl;
+
+   // Now test ImageWorkbench, but we don't need as many tests
+   cout << "Now test a few of the same operations with the workbench" << endl;
+   int seIdx[2];
+   seIdx[0] = ImageWorkbench::addStructElt(createBinaryCircle(7));
+   seIdx[1] = ImageWorkbench::addStructElt(createBinaryCircle(15));
+
+   for(int test=1; test<5; test+=2)
+   {
+      int size = testSizes[test];
+      cudaImageHost   imgHost(size,size);
+      for(int i=0; i<size*size; i++)
+         imgHost[i] = i%2;
+
+      ImageWorkbench testIwb(imgHost);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         testIwb.Median();
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tWorkbench %4dx%4d with optimized 3x3:     (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n",
+            size, size, cputime, gputime, 1000.0/cputime);
+
+      for(int s=0; s<2; s++)
+      {
+         gpuStartTimer();
+         cpuStartTimer();
+         for(int i=0; i<NITER; i++)
+            testIwb.Median(seIdx[s]);
+         cudaThreadSynchronize();
+         cputime = cpuStopTimer()/NITER;
+         gputime = gpuStopTimer()/NITER;
+
+         int seSize = ImageWorkbench::getStructEltPtr(seIdx[s])->numCols();
+         printf("\tWorkbench %4dx%4d with %2dx%2d struct elt:  (real ms, gpu ms, FPS) = (%0.2f, %0.2f; %.1f FPS)\n",
+               size, size, seSize, seSize, cputime, gputime, 1000.0/cputime);
+      }
+
+      ImageWorkbench testIwb2(imgHost);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      int k;
+      for(int i=0; i<NITER; i++)
+         k = testIwb2.SumImage();
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tReduction SUM on a %4dx%4d image:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     size, size, cputime, gputime, 1000/cputime);
+      cout << "\tsum=" << k << endl;
+      cout << endl;    
+   }
+   cout << endl << endl;
+
+
+}
+
+
+

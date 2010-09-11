@@ -7,6 +7,7 @@
 #include <vector>
 #include <cutil_inline.h>
 #include <stopwatch.h>
+#include "cudaImageHost.h"
 
 #define IDX_1D(col, row, stride) ((col * stride) + row)
 #define COL_2D(index, stride) (index / stride)
@@ -335,12 +336,11 @@ void createLaplacianOfGaussianKernel(float* targPtr,
                                      int    diameter);
 
 // Assume diameter^2 target memory has already been allocated
-int createBinaryCircle(float* targPtr,
-                       int    diameter);
+int createBinaryCircle(int* targPtr,
+                       int  diameter);
 
 // Assume diameter^2 target memory has already been allocated
-int createBinaryCircle(int*   targPtr,
-                       int    diameter);
+cudaImageHost createBinaryCircle( int diameter);
 
 
 
@@ -359,10 +359,13 @@ int createBinaryCircle(int*   targPtr,
 __global__ void  Mask_Union_Kernel(     int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Intersect_Kernel( int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Subtract_Kernel(  int* srcA, int* srcB, int* dst);
-__global__ void  Mask_CountDiff_Kernel( int* srcA, int* srcB, int* dstScalar);
+__global__ void  Mask_Different_Kernel( int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Invert_Kernel(    int* srcA,            int* dst);
 __global__ void  Mask_Copy_Kernel(      int* srcA,            int* dst);
-__global__ void  Mask_Sum_Kernel(       int* srcA,            int* dstScalar);
+
+// Yes!  You need two EXTRA buffers to use Image_Sum;
+__global__ void  Image_SumReduceStep_Kernel(int* bufIn, int* bufOut, int lastBlockSize);
+int Image_Sum(int* devPtr, int* devTemp1, int* devTemp2, int arraySize);
 
 
 #endif

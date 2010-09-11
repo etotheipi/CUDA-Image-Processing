@@ -100,8 +100,8 @@ void createLaplacianOfGaussianKernel(float* targPtr,
 }
 
 // Assume diameter^2 target memory has already been allocated
-int createBinaryCircle(float* targPtr,
-                       int    diameter)
+int createBinaryCircle(int* targPtr,
+                       int  diameter)
 {
    float pxCtr = (float)(diameter-1) / 2.0f;
    float rad;
@@ -113,12 +113,12 @@ int createBinaryCircle(float* targPtr,
          rad = sqrt((c-pxCtr)*(c-pxCtr) + (r-pxCtr)*(r-pxCtr));
          if(rad <= pxCtr+0.5)
          {
-            targPtr[c*diameter+r] = 1.0f;
+            targPtr[c*diameter+r] = 1;
             seNonZero++;
          }
          else
          {
-            targPtr[c*diameter+r] = 0.0f;
+            targPtr[c*diameter+r] = 0;
          }
       }
    }
@@ -126,29 +126,23 @@ int createBinaryCircle(float* targPtr,
 }
 
 // Assume diameter^2 target memory has already been allocated
-int createBinaryCircle(int*   targPtr,
-                       int    diameter)
+cudaImageHost createBinaryCircle(int diameter)
 {
+   cudaImageHost out(diameter, diameter);
    float pxCtr = (float)(diameter-1) / 2.0f;
    float rad;
-   int seNonZero = 0;
    for(int c=0; c<diameter; c++)
    {
       for(int r=0; r<diameter; r++)
       {
          rad = sqrt((c-pxCtr)*(c-pxCtr) + (r-pxCtr)*(r-pxCtr));
          if(rad <= pxCtr+0.5)
-         {
-            targPtr[c*diameter+r] = 1.0f;
-            seNonZero++;
-         }
+            out(c,r) = 1.0f;
          else
-         {
-            targPtr[c*diameter+r] = 0.0f;
-         }
+            out(c,r) = 0.0f;
       }
    }
-   return seNonZero;
+   return out;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -304,6 +298,18 @@ __global__ void  Mask_Subtract_Kernel( int* A, int* B, int* devOut)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// (A - B):   A is set to 0 if B is 1, otherwise A is left alone
+__global__ void  Mask_Different_Kernel( int* A, int* B, int* devOut)
+{  
+   const int idx = blockDim.x*blockIdx.x + threadIdx.x;
+
+   // Convert to {-1, +1}
+   int aval = A[idx]*2 - 1;
+   int bval = B[idx]*2 - 1;
+   devOut[idx] = (aval*bval+1)/2;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 __global__ void  Mask_Invert_Kernel( int* A, int* devOut)
 {  
    const int idx = blockDim.x*blockIdx.x + threadIdx.x;
@@ -324,9 +330,133 @@ __global__ void  Mask_Invert_Kernel( int* A, int* devOut)
 
 ////////////////////////////////////////////////////////////////////////////////
 // TODO: Need to use reduction for this, but that can be kind of complicated
-//__global__ void  Mask_Sum_Kernel( int* A, int* globalMemSum)
-//{  
-   //const int idx = blockDim.x*blockIdx.x + threadIdx.x;
-   //if(A[idx] != B[idx])
-      //atomicAdd(numNotEqual, 1);
-//}
+//       This operation destroys the input data, and the final result will be
+//       stored in A[0]
+__global__ void  Mask_Sum_Kernel( int* A, int valCount, int* scalarOut)
+{  
+   
+   const int localIdx    = threadIdx.x;
+   const int globalIdx   = blockDim.x*blockIdx.x + threadIdx.x;
+   const int blockIdxOut = blockIdx.x / blockDim.x;
+
+   while(valCount > 1)
+   {
+      int localCount = blockDim.x;
+      while(localCount > 1)
+      {
+         localCount = localCount / 2;  
+         if(localIdx < localCount)
+            A[globalIdx] += A[globalIdx + localCount];
+      }
+   
+      if(localIdx == 0)
+         A[blockIdxOut] = A[globalIdx];
+
+      valCount = valCount / blockDim.x;
+   }
+
+   if(globalIdx==0)
+      scalarOut[0] = A[0];
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+//
+// This function takes an array of size N, and returns an array of size N/512
+// that has the same sum as the original.  This method will need to be called
+// recursively until the final size is one element that can be passed back to
+// the host.
+// 
+// This kernel is not scalable.  I just assume that the block size will be 
+// (256,1,1), so make sure you call it with that.  I did this to improve
+// simplicity and speed slightly, at the expense of scalability
+
+__global__ void  Image_SumReduceStep_Kernel( int* devBufIn,
+                                             int* devBufOut,
+                                             int  lastBlockSize)
+{  
+   // ONLY USE THIS FUNCTION WITH BLOCK SIZE = (256,1,1);
+   // We write it for that to 
+   __shared__ int sharedMem[4096];
+   int* shmBuf1 = (int*)sharedMem;
+   int* shmBuf2 = (int*)&sharedMem[512];
+
+   int globalIdx = 512 * blockIdx.x + threadIdx.x;
+   int localIdx  = threadIdx.x;
+
+   shmBuf1[localIdx]     = 0;
+   shmBuf1[localIdx+256] = 0;
+   shmBuf2[localIdx]     = 0;
+   shmBuf2[localIdx+256] = 0;
+
+   if(blockIdx.x == gridDim.x-1)
+   {
+      if(localIdx+256 >= lastBlockSize) devBufIn[globalIdx+256] = 0;
+      if(localIdx     >= lastBlockSize) devBufIn[globalIdx]     = 0;
+   }
+
+   // Now we reduce each block of 512 values (256 threads) to a single number
+
+   shmBuf1[localIdx] = devBufIn[globalIdx] + devBufIn[globalIdx + 256]; __syncthreads();
+   if(localIdx < 128) shmBuf2[localIdx] = shmBuf1[localIdx]+shmBuf1[localIdx+128]; __syncthreads();
+   if(localIdx < 64)  shmBuf1[localIdx] = shmBuf2[localIdx]+shmBuf2[localIdx+64];  __syncthreads();
+   if(localIdx < 32)  shmBuf2[localIdx] = shmBuf1[localIdx]+shmBuf1[localIdx+32];  __syncthreads();
+   if(localIdx < 16)  shmBuf1[localIdx] = shmBuf2[localIdx]+shmBuf2[localIdx+16];  __syncthreads();
+   if(localIdx < 8)   shmBuf2[localIdx] = shmBuf1[localIdx]+shmBuf1[localIdx+8];   __syncthreads();
+   if(localIdx < 4)   shmBuf1[localIdx] = shmBuf2[localIdx]+shmBuf2[localIdx+4];   __syncthreads();
+   if(localIdx < 2)   shmBuf2[localIdx] = shmBuf1[localIdx]+shmBuf1[localIdx+2];   __syncthreads();
+
+   // 2 -> 1
+   if(localIdx < 1)
+      devBufOut[blockIdx.x] = shmBuf2[localIdx] + shmBuf2[localIdx + 1];
+   __syncthreads(); 
+
+}
+
+
+// Yes, you really do need to pass in 2 full-sized, EXTRA, buffers
+int Image_Sum(int* devImgToSum, int* devTemp1, int* devTemp2, int arraySize)
+{
+   // Yes, it seems silly to use two temp buffers to sum up an image, but
+   // my goal was to make the reduction-kernel simple with the log(n) order of
+   // growth, but not necessarily space-efficient
+   
+   cudaMemcpy(devTemp1, devImgToSum, arraySize*sizeof(int), cudaMemcpyDeviceToDevice);
+   int* buf1 = devTemp1;
+   int* buf2 = devTemp2;
+   int* bufTemp;
+
+   // The reduction kernel geometry is hardcoded b/c I wanted the code to be 
+   // simple, not necessarily scalable
+   dim3 BLOCK(256,1,1);
+   int nEltsLeft = arraySize;
+
+   while(nEltsLeft > 1)
+   {
+      int nBlocks = (nEltsLeft-1)/512+1;
+      int lastBlockSize = ((nEltsLeft - (nBlocks-1)*512 ) - 1) % 512 + 1;
+      dim3 GRID(nBlocks, 1, 1);
+
+      Image_SumReduceStep_Kernel<<<GRID,BLOCK>>>(buf1, buf2, lastBlockSize);
+
+      bufTemp = buf1; 
+      buf1    = buf2;
+      buf2    = bufTemp;
+
+      nEltsLeft = nBlocks;
+
+      cudaThreadSynchronize();
+   }
+
+   // Seems silly to do a memcpy like this to get one number out of the device
+   // but I'm not aware of any other way (there probably is)
+   int output; 
+   cudaMemcpy(&output, buf1, sizeof(int), cudaMemcpyDeviceToHost);
+   return output;
+}
+
+
+
+
+
+

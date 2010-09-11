@@ -70,15 +70,20 @@ void ImageWorkbench::deleteExtraBuffer(void)
 void ImageWorkbench::createTempBuffer(void)
 {
    int newIndex = (int)tempBuffers_.size();
+
    cudaImageDevice newBuf;
    tempBuffers_.push_back(newBuf);
    tempBuffers_[newIndex].resize(imgCols_, imgRows_);
+
+   // Make sure there are as many flags as there are buffers
+   tempBuffersLockFlag_.push_back(false);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::deleteTempBuffer(void)
 {
    tempBuffers_.pop_back();
+   tempBuffersLockFlag_.pop_back();
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -121,9 +126,10 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    // are low enough to allow 6 blocks/MP).
    setBlockSize1D(256);
 
-   // For 2D, 32x8 dramatically reduces bank conflicts, compared to 16x16
-   setBlockSize2D(32, 8);
+   // For 2D, 8x32 dramatically reduces bank conflicts, compared to 16x16
+   setBlockSize2D(8, 32);
 
+   /*
    cout << endl;
    cout << "***Initializing new ImageWorkbench object" << endl;
    printf("\tImage Size (numCols, numRows) == (%d, %d)\n", imgCols_, imgRows_);
@@ -133,9 +139,11 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    printf("\t2D block size is (%d, %d, %d)\n", BLOCK_2D_.x, BLOCK_2D_.y, BLOCK_2D_.z);
    printf("\t2D grid  size is (%d, %d, %d)\n", GRID_2D_.x,  GRID_2D_.y,  GRID_2D_.z);
    cout << endl;
+   */
 
    extraBuffers_ = vector<cudaImageDevice>(0);
    tempBuffers_  = vector<cudaImageDevice>(0);
+   tempBuffersLockFlag_  = vector<bool>(0);
 
    buffer1_.copyFromHost(hostImg);
    buffer2_.resize(imgCols_, imgRows_);
@@ -232,6 +240,34 @@ void ImageWorkbench::flipBuffers(void)
    }
 }
 
+
+
+/////////////////////////////////////////////////////////////////////////////
+int  ImageWorkbench::getTempBuffer(void)
+{
+   int bufIndexOut =  0;
+   int vectIndex   = -1;
+   do 
+   {
+      bufIndexOut--;
+      vectIndex++;
+
+      // Make sure that this buffer exists
+      getBufPtrAny(bufIndexOut);
+
+   } while(tempBuffersLockFlag_[vectIndex] == true);
+
+   tempBuffersLockFlag_[vectIndex] = true;
+   return bufIndexOut;
+}
+
+/////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::releaseTempBuffer(int bufIdx)
+{
+   int vectIndex = (-1)*bufIdx - 1;
+   tempBuffersLockFlag_[vectIndex] = false;
+}
+
 /////////////////////////////////////////////////////////////////////////////
 cudaImageDevice* ImageWorkbench::getBufferPtr( int idx )
 {
@@ -257,9 +293,10 @@ cudaImageDevice* ImageWorkbench::getBufPtrAny( int idx, bool allowTemp)
    {
       if(allowTemp)
       {
-         while((-1)*idx > (int)tempBuffers_.size())
+         int vectIndex = (-1)*idx - 1;
+         while(vectIndex+1 > (int)tempBuffers_.size())
             createTempBuffer();
-         out = &tempBuffers_[(-1)*idx-1];
+         out = &tempBuffers_[vectIndex];
       }
       else
          cout << "***ERROR:  temp buffers only accessible to IWB methods"<<endl;
@@ -356,24 +393,110 @@ void ImageWorkbench::Median(int seIndex, int srcBuf, int dstBuf)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::Open(int seIndex, int srcBuf, int dstBuf)
 {
-   ZErode ( seIndex, srcBuf,   -1  );
-   ZDilate( seIndex,  -1,    dstBuf);
+   int tmpBuf = getTempBuffer();
+   ZErode ( seIndex, srcBuf, tmpBuf );
+   ZDilate( seIndex, tmpBuf, dstBuf );
+   releaseTempBuffer(tmpBuf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::Close(int seIndex, int srcBuf, int dstBuf)
 {
-   ZDilate( seIndex, srcBuf,   -1  );
-   ZErode ( seIndex,  -1,    dstBuf);
+   int tmpBuf = getTempBuffer();
+   ZDilate( seIndex, srcBuf, tmpBuf );
+   ZErode ( seIndex, tmpBuf, dstBuf );
+   releaseTempBuffer(tmpBuf);
 }
 
+////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::FindAndRemove(int seIndex, int srcBuf, int dstBuf)
 {
-   ZHitOrMiss(seIndex, srcBuf,-1);
-   ZSubtract(-1,  srcBuf,  dstBuf);
+   int tmpBuf = getTempBuffer();
+   ZHitOrMiss(seIndex, srcBuf, tmpBuf);
+   ZSubtract(  tmpBuf, srcBuf, dstBuf);
+   releaseTempBuffer(tmpBuf);
 }
 
 
+////////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::CopyBuffer(int dstBuf, int srcBuf)
+{ 
+   cudaImageDevice* src = getBufferPtr(srcBuf);
+   cudaImageDevice* dst = getBufferPtr(dstBuf);
+   dst->copyFromDevice(*src);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+void ImageWorkbench::ZCopyBuffer(int dstBuf, int srcBuf=A)
+{ 
+   cudaImageDevice* src = getBufPtrAny(srcBuf);
+   cudaImageDevice* dst = getBufPtrAny(dstBuf);
+   dst->copyFromDevice(*src);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+int ImageWorkbench::SumImage(int srcBuf)
+{
+   return ZSumImage(srcBuf);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+int ImageWorkbench::ZSumImage(int bufIdx)
+{
+   // Yes, it seems silly to use two temp buffers to sum up an image, but
+   // my goal was to make the reduction-kernel simple with the log(n) order of
+   // growth, but not necessarily space-efficient
+
+   // Also, if we are trying to sum a temp buffer here, we don't want to
+   // overwrite when getting more temp buffers
+   int buf1Idx = getTempBuffer();
+   int buf2Idx = getTempBuffer();
+   ZCopyBuffer(buf1Idx, bufIdx);  // copy (dst, src)
+   int* buf1 = getBufPtrAny(buf1Idx)->getDataPtr();
+   int* buf2 = getBufPtrAny(buf2Idx)->getDataPtr();
+   int* bufTemp;
+
+   // The reduction kernel geometry is hardcoded b/c I wanted the code to be 
+   // simple, not necessarily scalable
+   dim3 BLOCK(256,1,1);
+   int nEltsLeft = imgElts_;
+
+   while(nEltsLeft > 1)
+   {
+      int nBlocks = (nEltsLeft-1)/512+1;
+      int lastBlockSize = ((nEltsLeft - (nBlocks-1)*512 ) - 1) % 512 + 1;
+      dim3 GRID(nBlocks, 1, 1);
+
+      Image_SumReduceStep_Kernel<<<GRID,BLOCK>>>(buf1, buf2, lastBlockSize);
+
+      bufTemp = buf1; 
+      buf1    = buf2;
+      buf2    = bufTemp;
+
+      nEltsLeft = nBlocks;
+
+      cudaThreadSynchronize();
+   }
+
+   releaseTempBuffer(buf1Idx);
+   releaseTempBuffer(buf2Idx);
+
+   // Seems silly to do a memcpy like this to get one number out of the device
+   // but I'm not aware of any other way (there probably is)
+   int output; 
+   cudaMemcpy(&output, buf1, sizeof(int), cudaMemcpyDeviceToHost);
+   return output;
+}
+
+
+int ImageWorkbench::CountChanged(void)
+{
+   int tmpBuf = getTempBuffer();
+   Different(A, B, tmpBuf);
+   int sum = SumImage(tmpBuf);
+   releaseTempBuffer(tmpBuf);
+   return sum;
+}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -484,15 +607,19 @@ void ImageWorkbench::ZMedian(int seIndex, int srcBuf, int dstBuf)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZOpen(int seIndex, int srcBuf, int dstBuf)
 {
-   ZErode ( seIndex, srcBuf,  -1   );
-   ZDilate( seIndex,  -1,    dstBuf);
+   int tmpBuf = getTempBuffer();
+   ZErode ( seIndex, srcBuf, tmpBuf );
+   ZDilate( seIndex, tmpBuf, dstBuf );
+   releaseTempBuffer(tmpBuf);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZClose(int seIndex, int srcBuf, int dstBuf)
 {
-   ZDilate( seIndex, srcBuf,  -1   );
-   ZErode(  seIndex,  -1,    dstBuf);
+   int tmpBuf = getTempBuffer();
+   ZDilate( seIndex, srcBuf, tmpBuf );
+   ZErode(  seIndex, tmpBuf, dstBuf );
+   releaseTempBuffer(tmpBuf);
 }
 
 
@@ -502,8 +629,10 @@ void ImageWorkbench::ZClose(int seIndex, int srcBuf, int dstBuf)
 // mask that fully intersects the original image, and then subtract. 
 void ImageWorkbench::ZFindAndRemove(int seIndex, int srcBuf, int dstBuf)
 {
-   ZHitOrMiss(seIndex, srcBuf,-1);
-   ZSubtract(-1, srcBuf, dstBuf);
+   int tmpBuf = getTempBuffer();
+   ZHitOrMiss( seIndex, srcBuf, tmpBuf );
+   ZSubtract(  tmpBuf,  srcBuf, dstBuf );
+   releaseTempBuffer(tmpBuf);
 }
 
 //int ImageWorkbench::NumPixelsChanged()
@@ -526,83 +655,92 @@ void ImageWorkbench::ZFindAndRemove(int seIndex, int srcBuf, int dstBuf)
 //}
 
 /////////////////////////////////////////////////////////////////////////////
-// With all ZOperations implemented, I can finally implement complex batch
-// operations like Thinning
+// I know what you're thinking:  why don't I use ZFindAndRemove to write
+// the sweep functions.  Well, I would, except that these ops use the 
+// opimized 3x3 kernels which cannot be invoked by FindAndRemove().  Oh well.
 void ImageWorkbench::ThinningSweep(void)
 {
-   // 1  (A->temp1->B)
-   ZThin1   ( A, -1);
-   ZSubtract(-1,  A,  B);
+   int T = getTempBuffer();
 
-   // 2  (B->temp1->B)
-   ZThin2   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 1  (A->tmp->B)
+   ZThin1   ( A,  T);
+   ZSubtract( T,  A,  B);
 
-   // 3  (B->temp1->B)
-   ZThin3   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 2  (B->tmp->B)
+   ZThin2   ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 4  (B->temp1->B)
-   ZThin4   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 3  (B->tmp->B)
+   ZThin3   ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 5  (B->temp1->B)
-   ZThin5   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 4  (B->tmp->B)
+   ZThin4   ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 6  (B->temp1->B)
-   ZThin6   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 5  (B->tmp->B)
+   ZThin5   ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 7  (B->temp1->B)
-   ZThin7   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 6  (B->tmp->B)
+   ZThin6   ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 8  (B->temp1->B)
-   ZThin8   ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 7  (B->tmp->B)
+   ZThin7   ( B,  T);
+   ZSubtract( T,  B,  B);
+
+   // 8  (B->tmp->B)
+   ZThin8   ( B,  T);
+   ZSubtract( T,  B,  B);
 
    // And we're done
    flipBuffers();
+
+   releaseTempBuffer(T);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::PruningSweep(void)
 {
-   // 1  (A->temp1->B)
-   ZPrune1  ( A, -1);
-   ZSubtract(-1,  A,  B);
+   int T = getTempBuffer();
 
-   // 2  (B->temp1->B)
-   ZPrune2  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 1  (A->tmp->B)
+   ZPrune1  ( A,  T);
+   ZSubtract( T,  A,  B);
 
-   // 3  (B->temp1->B)
-   ZPrune3  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 2  (B->tmp->B)
+   ZPrune2  ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 4  (B->temp1->B)
-   ZPrune4  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 3  (B->tmp->B)
+   ZPrune3  ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 5  (B->temp1->B)
-   ZPrune5  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 4  (B->tmp->B)
+   ZPrune4  ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 6  (B->temp1->B)
-   ZPrune6  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 5  (B->tmp->B)
+   ZPrune5  ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 7  (B->temp1->B)
-   ZPrune7  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 6  (B->tmp->B)
+   ZPrune6  ( B,  T);
+   ZSubtract( T,  B,  B);
 
-   // 8  (B->temp1->B)
-   ZPrune8  ( B, -1);
-   ZSubtract(-1,  B,  B);
+   // 7  (B->tmp->B)
+   ZPrune7  ( B,  T);
+   ZSubtract( T,  B,  B);
+
+   // 8  (B->tmp->B)
+   ZPrune8  ( B,  T);
+   ZSubtract( T,  B,  B);
 
    // And we're done
    flipBuffers();
+
+   releaseTempBuffer(T);
 }
 
 

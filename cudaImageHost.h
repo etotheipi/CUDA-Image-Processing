@@ -57,6 +57,10 @@ public:
    int  numRows(void)     const {return imgRows_;}
    int  numElts(void)     const {return imgElts_;}
    int  numBytes(void)    const {return imgBytes_;}
+
+   // This method is really only for timing tests.  Obviously we created
+   // this library so we can use the GPU for 50-200x speed up.
+   void Dilate(cudaImageHost SE, cudaImageHost & target);
 };
 
 #endif
