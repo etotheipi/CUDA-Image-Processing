@@ -201,20 +201,20 @@ CREATE_3X3_MORPH_KERNEL( Prune4,         7,
                                              1,  1, -1,
                                              0, -1, -1);
 
-CREATE_3X3_MORPH_KERNEL( Prune5,         9,
+CREATE_3X3_MORPH_KERNEL( Prune5,         7,
                                             -1, -1, -1,
-                                            -1,  1, -1,
-                                             1, -1, -1);
-CREATE_3X3_MORPH_KERNEL( Prune6,         9,
+                                             0,  1, -1,
+                                             1,  0, -1);
+CREATE_3X3_MORPH_KERNEL( Prune6,         7,
                                             -1, -1, -1,
-                                            -1,  1, -1,
-                                            -1, -1,  1);
-CREATE_3X3_MORPH_KERNEL( Prune7,         9,
-                                            -1, -1,  1,
-                                            -1,  1, -1,
+                                            -1,  1,  0,
+                                            -1,  0,  1);
+CREATE_3X3_MORPH_KERNEL( Prune7,         7,
+                                            -1,  0,  1,
+                                            -1,  1,  0,
                                             -1, -1, -1);
-CREATE_3X3_MORPH_KERNEL( Prune8,         9,
-                                             1, -1, -1,
-                                            -1,  1, -1,
+CREATE_3X3_MORPH_KERNEL( Prune8,         7,
+                                             1,  0, -1,
+                                             0,  1, -1,
                                             -1, -1, -1);
 

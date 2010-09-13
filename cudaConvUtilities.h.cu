@@ -47,7 +47,7 @@ using namespace std;
    const int padRectRow    = localRow + psfRowRad;   \
    const int padRectPixels = padRectStride * (blockDim.x + 2*psfColRad);   \
 \
-   __shared__ int sharedMem[SHMEM];   \
+   __shared__ char sharedMem[8192]; \
    int* shmPadRect  = (int*)sharedMem;   \
    int* shmOutput   = (int*)&shmPadRect[ROUNDUP32(padRectPixels)];   \
    int nLoop;
@@ -183,7 +183,7 @@ __global__ void  Morph3x3_##name##_Kernel(       \
    const int padRectCol    = localCol + 1;   \
    const int padRectRow    = localRow + 1;   \
 \
-   __shared__ int sharedMem[SHMEM];   \
+   __shared__ char sharedMem[SHMEM];   \
    int* shmPadRect  = (int*)sharedMem;   \
    int* shmOutput   = (int*)&shmPadRect[512];   \
 \
@@ -359,7 +359,7 @@ cudaImageHost createBinaryCircle( int diameter);
 __global__ void  Mask_Union_Kernel(     int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Intersect_Kernel( int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Subtract_Kernel(  int* srcA, int* srcB, int* dst);
-__global__ void  Mask_Different_Kernel( int* srcA, int* srcB, int* dst);
+__global__ void  Mask_Difference_Kernel( int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Invert_Kernel(    int* srcA,            int* dst);
 __global__ void  Mask_Copy_Kernel(      int* srcA,            int* dst);
 

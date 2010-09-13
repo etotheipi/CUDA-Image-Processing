@@ -419,6 +419,28 @@ void ImageWorkbench::FindAndRemove(int seIndex, int srcBuf, int dstBuf)
 
 
 ////////////////////////////////////////////////////////////////////////////////
+// Argument-less function calls the 3x3 optimized methods
+void ImageWorkbench::Open(void)
+{
+   int tmpBuf = getTempBuffer();
+   ZErode (A, tmpBuf);
+   ZDilate(tmpBuf, B);
+   releaseTempBuffer(tmpBuf);
+   flipBuffers();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Argument-less function calls the 3x3 optimized methods
+void ImageWorkbench::Close(void)
+{
+   int tmpBuf = getTempBuffer();
+   ZDilate(A, tmpBuf);
+   ZErode (tmpBuf, B);
+   releaseTempBuffer(tmpBuf);
+   flipBuffers();
+}
+
+////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::CopyBuffer(int dstBuf, int srcBuf)
 { 
    cudaImageDevice* src = getBufferPtr(srcBuf);
@@ -492,8 +514,8 @@ int ImageWorkbench::ZSumImage(int bufIdx)
 int ImageWorkbench::CountChanged(void)
 {
    int tmpBuf = getTempBuffer();
-   Different(A, B, tmpBuf);
-   int sum = SumImage(tmpBuf);
+   ZDifference(A, B, tmpBuf);
+   int sum = ZSumImage(tmpBuf);
    releaseTempBuffer(tmpBuf);
    return sum;
 }
@@ -635,24 +657,6 @@ void ImageWorkbench::ZFindAndRemove(int seIndex, int srcBuf, int dstBuf)
    releaseTempBuffer(tmpBuf);
 }
 
-//int ImageWorkbench::NumPixelsChanged()
-//{
-   //MaskCountDiff_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
-                               // *bufferPtrA_, 
-                               // *bufferPtrB_, 
-                               //&nChanged);
-   // No flip
-//}
-
-
-//int ImageWorkbench::SumMask()
-//{
-   //MaskSum_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
-                               // *bufferPtrA_, 
-                               // *bufferPtrB_, 
-                               //&nChanged);
-   // No flip
-//}
 
 /////////////////////////////////////////////////////////////////////////////
 // I know what you're thinking:  why don't I use ZFindAndRemove to write

@@ -222,6 +222,12 @@ void cudaImageDevice::printMask(char zero, char one)
    hptr.printMask(zero, one);
 }
 
+void cudaImageDevice::writeFile(string filename)
+{
+   cudaImageHost hptr;
+   copyToHost(hptr);
+   hptr.writeFile(filename);
+}
 
 
 

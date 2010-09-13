@@ -134,7 +134,7 @@ void runCudaImageUnitTests(void)
    cout << endl;
    cout << "****************************************";
    cout << "***************************************" << endl;
-   cout << "***Test CudaImage classes and GPU allocation/copy speeds" << endl;
+   cout << "***Unit tests for CudaImage classes" << endl;
 
    // Allocate some memory the "old" way
    int  d = 5; // D~Diameter
@@ -421,97 +421,72 @@ void runWorkbenchUnitTests(void)
    /////////////////////////////////////////////////////////////////////////////
    // With a working workbench, we can finally SOLVE A MAZE !!
    cout << endl << "Time to solve a maze! " << endl << endl;
-   cudaImageHost mazeImg("maze512.txt", 512, 512);
+   cudaImageHost mazeImg("elephantmaze.txt", 512, 512);
    ImageWorkbench iwbMaze(mazeImg);
 
-   // Write the original maze to file
+   // Morph-close the image [for fun, not necessary], write it to file for ref
+   iwbMaze.Close();  
    iwbMaze.copyBufferToHost(imgOut);
    imgOut.writeFile("Maze1_In.txt");
 
    // Start thinning
-   cout << "Thinning sweep 1" << endl;
+   cout << "\tThinning sweep 2x" << endl;
+   iwbMaze.ThinningSweep();
    iwbMaze.ThinningSweep();
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze2_Thin.txt");
+   imgOut.writeFile("Maze2_Thin2x.txt");
 
-   
-   // Start thinning
-   cout << "Thinning sweep 2-4" << endl;
-   for(int i=0; i<3; i++)
-      iwbMaze.ThinningSweep();
-   iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze3_Thin4.txt");
 
-   cout << "Thinning sweep 5-10" << endl;
-   for(int i=0; i<6; i++)
-      iwbMaze.ThinningSweep();
-   iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze4_Thin10.txt");
-
-   // More thinning
-   cout << "Pruning sweep 1-5" << endl;
-   iwbMaze.PruningSweep();
-   iwbMaze.PruningSweep();
-   iwbMaze.PruningSweep();
-   iwbMaze.PruningSweep();
-   iwbMaze.PruningSweep();
-   iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze5_Prune5.txt");
-
-   // And again...
-   cout << "100 sweeps, PPPPT" << endl;
-   for(int i=0; i<20; i++)
+   // Finish thinning by checking when the image is no longer changing
+   cout << "\tThinning sweep til complete" << endl;
+   int thinOps = 2;
+   int diff=-1;
+   while(diff != 0)
    {
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
       iwbMaze.ThinningSweep();
+      diff = iwbMaze.CountChanged();
+      thinOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze6_Prune100.txt");
+   imgOut.writeFile("Maze3_ThinComplete.txt");
 
-   // We comment out these three loops, because they do tens of thousands
-   // of morph ops, to solve a maze that is unnecessarily difficult.
-   // Do it once for proof of concept, then comment it out.
-   /*
-   cout << "Pruning sweep 101-1000, 9P 1T" << endl;
-   for(int i=0; i<90; i++)
+   cout << "\tPruning sweep 1-5" << endl;
+   int pruneOps = 0;
+   for(int i=0; i<5; i++)
    {
       iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.PruningSweep();
-      iwbMaze.ThinningSweep();
+      pruneOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze7_Prune1000.txt");
+   imgOut.writeFile("Maze4_Prune5x.txt");
 
-   cout << "Pruning sweep 1000 more, 50P 1T" << endl;
-   for(int i=0; i<20; i++)
+   cout << "\tPruning sweep 6-20" << endl;
+   for(int i=0; i<15; i++)
    {
-      for(int j=0; j<50; j++)
-         iwbMaze.PruningSweep();
-      iwbMaze.ThinningSweep();
+      iwbMaze.PruningSweep();
+      pruneOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze8_Prune2000.txt");
+   imgOut.writeFile("Maze5_Prune20x.txt");
 
-   cout << "Pruning sweep 5000 more, 50P 1T" << endl;
-   for(int i=0; i<100; i++)
+   diff=-1;
+   cout << "\tPruning sweep until complete" << endl;
+   while(diff != 0)
    {
-      for(int j=0; j<50; j++)
-         iwbMaze.PruningSweep();
-      iwbMaze.ThinningSweep();
+      iwbMaze.PruningSweep();
+      diff = iwbMaze.CountChanged();
+      pruneOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze9_Prune10000.txt");
-   */
+   imgOut.writeFile("Maze6_PruneComplete.txt");
+
+   int totalHomOps = 8*(thinOps + pruneOps);
+   cout << "Finished the maze!  Total operations: " << endl
+        << "\t" << thinOps  << " thinning sweeps and " << endl
+        << "\t" << pruneOps << " pruning sweeps" << endl
+        << "\tTotal of " << totalHomOps << " HitOrMiss operations and the same "
+        << "number of subtract operations" << endl << endl;
+
 
    // Check to see how much device memory we're using right now
    cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
@@ -579,7 +554,7 @@ void runTimingTests(void)
    cpuStartTimer();
    moreHostData = hostBigImg;
    cputime = cpuStopTimer();
-   printf("\t\tCopying 64MB within HOST took %0.2f ms (%.0f MB/s)\n\n\n", cputime, 64000.0f/cputime);
+   printf("\t\tCopying 64MB within HOST took %0.2f ms (%.0f MB/s)\n", cputime, 64000.0f/cputime);
 
 
    // First we do elaborate timings on raw kernel functions using direct memory
@@ -587,8 +562,11 @@ void runTimingTests(void)
    // much overhead there is.  I expect there will be virtually no overhead, but
    // I won't know til I test it.
 
-   cout << "Timing a variety of morphological median calculations..." << endl;
-   int NITER=5;
+   cout << endl << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << "***Timing a variety of morphological median calculations..." << endl;
+   int NITER=10;
 
    vector<cudaImageDevice> circ(8);
    circ[0].copyFromHost(createBinaryCircle(3));
@@ -600,13 +578,13 @@ void runTimingTests(void)
    circ[6].copyFromHost(createBinaryCircle(15));
    circ[7].copyFromHost(createBinaryCircle(17));
 
-   int testSizes[5] = {256, 512, 1024, 2048, 4096};
-   for(int test=0; test<5; test++)
+   int testSizes[5] = {256, 512, 1024, 2048};
+   for(int test=0; test<4; test++)
    {
       int size = testSizes[test];
       int sizesq = size*size;
 
-      dim3 BLOCK(32, 8, 1);
+      dim3 BLOCK(8, 32, 1);
       dim3 GRID(size/BLOCK.x, size/BLOCK.y, 1);
 
       cudaImageHost   imgHost(size,size);
@@ -667,8 +645,8 @@ void runTimingTests(void)
       cudaThreadSynchronize();
       cputime = cpuStopTimer()/NITER;
       gputime = gpuStopTimer()/NITER;
-      printf("\tMask UNION two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
-                     size, size, cputime, gputime, 1000/cputime);
+      printf("\tMask  %-16s two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     "UNION", size, size, cputime, gputime, 1000/cputime);
 
       gpuStartTimer();
       cpuStartTimer();
@@ -677,8 +655,8 @@ void runTimingTests(void)
       cudaThreadSynchronize();
       cputime = cpuStopTimer()/NITER;
       gputime = gpuStopTimer()/NITER;
-      printf("\tMask INTERSECT two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
-                     size, size, cputime, gputime, 1000/cputime);
+      printf("\tMask  %-16s two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     "INTERSECT", size, size, cputime, gputime, 1000/cputime);
 
       gpuStartTimer();
       cpuStartTimer();
@@ -687,8 +665,8 @@ void runTimingTests(void)
       cudaThreadSynchronize();
       cputime = cpuStopTimer()/NITER;
       gputime = gpuStopTimer()/NITER;
-      printf("\tMask SUBTRACT two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
-                     size, size, cputime, gputime, 1000/cputime);
+      printf("\tMask  %-16s two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     "SUBTRACT", size, size, cputime, gputime, 1000/cputime);
 
       gpuStartTimer();
       cpuStartTimer();
@@ -697,8 +675,18 @@ void runTimingTests(void)
       cudaThreadSynchronize();
       cputime = cpuStopTimer()/NITER;
       gputime = gpuStopTimer()/NITER;
-      printf("\tMask INVERT a %4dx%4d image:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
-                     size, size, cputime, gputime, 1000/cputime);
+      printf("\tMask  %-16s one %4dx%4d image:   (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     "INVERT", size, size, cputime, gputime, 1000/cputime);
+
+      gpuStartTimer();
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Mask_Difference_Kernel<<<GRID1D,BLOCK1D>>>(devIn, devOut, devOut);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      gputime = gpuStopTimer()/NITER;
+      printf("\tMask  %-16s two %4dx%4d images:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     "DIFFERENCE", size, size, cputime, gputime, 1000/cputime);
 
       gpuStartTimer();
       cpuStartTimer();
@@ -708,19 +696,65 @@ void runTimingTests(void)
       cudaThreadSynchronize();
       cputime = cpuStopTimer()/NITER;
       gputime = gpuStopTimer()/NITER;
-      printf("\tReduction SUM on a %4dx%4d image:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
-                     size, size, cputime, gputime, 1000/cputime);
-      cout << "\tsum=" << k << endl;
+      printf("\tImage %-16s one %4dx%4d image:   (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
+                     "REDUCTION SUM", size, size, cputime, gputime, 1000/cputime);
+      cout << "\t\tsum=" << k <<  " (should be " << size*size/2 << ")" << endl;
 
       cout << endl;
-      cudaImageDevice::calculateDeviceMemoryUsage(true);
       cout << endl;
 
    }
    cout << endl << endl;
 
+   /////////////////////////////////////////////////////////////////////////////
+   cout << endl << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << "***Timing tests on different block sizes, 1024x1024 image with 7x7 SE" << endl << endl;
+
+   int size = 1024;
+   int seDiam = 7;
+   dim3 BLOCK;
+   dim3 GRID;
+   cudaImageHost   imgHost(size,size);
+   cudaImageDevice in1024(size,size);
+   cudaImageDevice out1024(size,size);
+   cudaImageDevice se7(createBinaryCircle(seDiam));
+
+
+   vector<dim3> BLOCKvect(0);
+   BLOCKvect.push_back( dim3( 16, 16, 1) );
+   BLOCKvect.push_back( dim3( 32,  8, 1) );
+   BLOCKvect.push_back( dim3(  8, 32, 1) );
+   BLOCKvect.push_back( dim3( 16, 32, 1) );
+   BLOCKvect.push_back( dim3( 32, 16, 1) );
+   BLOCKvect.push_back( dim3( 16,  8, 1) );
+   BLOCKvect.push_back( dim3(  8, 16, 1) );
+   BLOCKvect.push_back( dim3(  8,  8, 1) );
+   
+   for(int bs=0; bs<(int)BLOCKvect.size(); bs++)
+   {
+      dim3 BLOCK = BLOCKvect[bs];
+      dim3 GRID(size/BLOCK.x, size/BLOCK.y, 1);
+      cpuStartTimer();
+      for(int i=0; i<NITER; i++)
+         Morph_Generic_Kernel<<<GRID,BLOCK>>>(in1024, out1024, size, size, se7, seDiam/2, seDiam/2, 0);
+      cudaThreadSynchronize();
+      cputime = cpuStopTimer()/NITER;
+      printf("\tBlock size = (%2d,%2d), Grid size = (%3d,%3d), CPU Timing:  %2.2f ms -- %3.1f FPS\n",
+            BLOCK.x, BLOCK.y, GRID.x, GRID.y, cputime, 1000/cputime);
+   }
+
+
+
+
    // Now test ImageWorkbench, but we don't need as many tests
-   cout << "Now test a few of the same operations with the workbench" << endl;
+   // We just want to confirm that there isn't any crazy overhead using IWB
+   // There shouldn't be, but we won't know til we test it
+   cout << endl << endl;
+   cout << "****************************************";
+   cout << "***************************************" << endl;
+   cout << endl << "***Test a few of the same operations with the workbench" << endl;
    int seIdx[2];
    seIdx[0] = ImageWorkbench::addStructElt(createBinaryCircle(7));
    seIdx[1] = ImageWorkbench::addStructElt(createBinaryCircle(15));
@@ -771,10 +805,11 @@ void runTimingTests(void)
       gputime = gpuStopTimer()/NITER;
       printf("\tReduction SUM on a %4dx%4d image:  (real ms, gpu ms, FPS) = (%.2f, %.2f; %.1f FPS)\n", 
                      size, size, cputime, gputime, 1000/cputime);
-      cout << "\tsum=" << k << endl;
+      cout << "\tsum=" << k << "   (should be " << size*size/2 << ")" << endl;
       cout << endl;    
    }
    cout << endl << endl;
+   cudaImageDevice::calculateDeviceMemoryUsage(true);
 
 
 }

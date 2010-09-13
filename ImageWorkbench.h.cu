@@ -281,6 +281,7 @@ public:
    void FindAndRemove(  int seIndex, int srcBuf, int dstBuf);
    void CopyBuffer(                  int dstBuf, int srcBuf);
 
+
    int  SumImage(int srcBuf=A);
    int  CountChanged(void);
 
@@ -296,6 +297,11 @@ public:
    void PruningSweep(void);
 
  
+public:
+   // Do opening and closing with the default 3x3 kernels
+   void Open(void);
+   void Close(void); 
+
    /////////////////////////////////////////////////////////////////////////////
    // These macro calls create wrappers for the optimized 3x3 kernel functions
    // Each one creates 3 workbench methods:
@@ -341,7 +347,6 @@ public:
    CREATE_3X3_WORKBENCH_METHOD( Prune7 );
    CREATE_3X3_WORKBENCH_METHOD( Prune8 );
 
-   CREATE_MASK_UNARY_OP_WORKBENCH_METHOD( Invert );
 
    // Order of arguments can be confusing for binary ops, use Subtract for example
    //
@@ -351,10 +356,12 @@ public:
    //                                        always input and output so that we have
    //                                        output = input - bufN
    //
+   CREATE_MASK_UNARY_OP_WORKBENCH_METHOD( Invert );
+
    CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Union );
    CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Intersect );
    CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Subtract );
-   CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Different );
+   CREATE_MASK_BINARY_OP_WORKBENCH_METHOD( Difference );
 
 
 private:

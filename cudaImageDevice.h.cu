@@ -56,6 +56,7 @@ public:
    
    // Should only be used for images of zeros and ones, print D's for "Device"
    void printMask(char zero='.', char one='D');
+   void writeFile(string filename);
 
    // Implicit cast to int* for functions that require int*
    operator int*() { return imgData_;}
