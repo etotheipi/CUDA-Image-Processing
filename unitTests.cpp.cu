@@ -331,9 +331,9 @@ void runWorkbenchUnitTests(void)
    createBinaryCircle(seCirc.getDataPtr(), seCircD);
 
    // Check that rectangular SEs work, too
-   int rectW = 9;
    int rectH = 5;
-   cudaImageHost seRect(rectW, rectH);
+   int rectW = 9;
+   cudaImageHost seRect(rectH, rectW);
    for(int r=0; r<rectH; r++)
       for(int c=0; c<rectW; c++)
          seRect(c, r) = 1;
@@ -381,7 +381,7 @@ void runWorkbenchUnitTests(void)
 
    // We Erode the image now, but with the basic 3x3
    cout << "Try a closing operation" << endl;
-   theIwb.Close(seIdxCircle11);
+   theIwb.Close(seIdxRect9x5);
    theIwb.copyBufferToHost(imgOut);
    imgOut.writeFile("Workbench4_Close.txt");
 
@@ -402,7 +402,7 @@ void runWorkbenchUnitTests(void)
    imgOut.writeFile("Workbench5b_erode.txt");
    
    iwb2.Subtract(1, A, A);
-   iwb2.copyBufferToHost(A, imgOut);
+   iwb2.copyBufferToHost(imgOut);  // default is always the input buffer A
    imgOut.writeFile("Workbench5c_subtract.txt");
 
    cudaImageHost cornerDetect(3,3);
@@ -427,14 +427,14 @@ void runWorkbenchUnitTests(void)
    // Morph-close the image [for fun, not necessary], write it to file for ref
    iwbMaze.Close();  
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze1_In.txt");
+   imgOut.writeFile("MazeTxt1_In.txt");
 
    // Start thinning
    cout << "\tThinning sweep 2x" << endl;
    iwbMaze.ThinningSweep();
    iwbMaze.ThinningSweep();
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze2_Thin2x.txt");
+   imgOut.writeFile("MazeTxt2_Thin2x.txt");
 
 
    // Finish thinning by checking when the image is no longer changing
@@ -448,7 +448,7 @@ void runWorkbenchUnitTests(void)
       thinOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze3_ThinComplete.txt");
+   imgOut.writeFile("MazeTxt3_ThinComplete.txt");
 
    cout << "\tPruning sweep 1-5" << endl;
    int pruneOps = 0;
@@ -458,7 +458,7 @@ void runWorkbenchUnitTests(void)
       pruneOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze4_Prune5x.txt");
+   imgOut.writeFile("MazeTxt4_Prune5x.txt");
 
    cout << "\tPruning sweep 6-20" << endl;
    for(int i=0; i<15; i++)
@@ -467,7 +467,7 @@ void runWorkbenchUnitTests(void)
       pruneOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze5_Prune20x.txt");
+   imgOut.writeFile("MazeTxt5_Prune20x.txt");
 
    diff=-1;
    cout << "\tPruning sweep until complete" << endl;
@@ -478,7 +478,7 @@ void runWorkbenchUnitTests(void)
       pruneOps++;
    }
    iwbMaze.copyBufferToHost(imgOut);
-   imgOut.writeFile("Maze6_PruneComplete.txt");
+   imgOut.writeFile("MazeTxt6_PruneComplete.txt");
 
    int totalHomOps = 8*(thinOps + pruneOps);
    cout << "Finished the maze!  Total operations: " << endl

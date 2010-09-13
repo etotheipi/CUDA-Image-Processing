@@ -1,0 +1,296 @@
+
+*******************************************************************************
+***Device query and selection:
+CUDA-enabled devices on this system:  2
+	* (0)      GeForce GTX 460 (767 MB): 	CUDA Capability 2.1 
+	  (1)          GeForce 210 (511 MB): 	CUDA Capability 1.2 
+*******************************************************************************
+
+*******************************************************************************
+***Unit tests for CudaImage classes
+	Testing ImageHost basic constructor               Passed?  1 
+	Testing ImageHost file I/O                        Passed?  1 
+	Testing ImageHost copy constructor                Passed?  1 
+	Testing ImageHost operator=()                     Passed?  1 
+	Testing ImageHost op= with diff img sizes         Passed?  1 
+	Testing ImageDevice constructor and copyToHost    Passed?  1 
+	Testing ImageDevice copyFromHost and copyToHost   Passed?  1 
+	Testing ImageDevice another constructor           Passed?  1 
+	Testing ImageDevice one more constructor          Passed?  1 
+	Testing ImageDevice Device2Device                 Passed?  1 
+
+
+	Check current device memory usage:
+	Device memory contains _5_ cudaImageDevice objects
+		Device Image   0 (ID=100):     5 x    5,      0.0000 MB
+		Device Image   1 (ID=101):     5 x    5,      0.0000 MB
+		Device Image   2 (ID=102):     5 x    5,      0.0000 MB
+		Device Image   3 (ID=104):     5 x    5,      0.0000 MB
+		Device Image   4 (ID=107):     5 x    5,      0.0000 MB
+		-------------------------------------------------------
+		Total Device Memory Used:                     0.0004 MB
+
+*******************************************************************************
+
+Executing morphology unit tests (no workbench)...
+
+Testing morphology operations on 256x256 mask.
+Reading mask from salt256.txt
+
+Using the unique, 17x17 structuring element:
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+0 0 0 0 . 0 . 0 0 0 . 0 . 0 . 0 0 
+0 0 0 0 . . . . . . . . . . 0 . 0 
+0 0 0 0 . . . . . . . . . 0 . 0 0 
+0 0 0 0 . . . . . . . . 0 . . . 0 
+0 0 0 0 . . . . . . . 0 . . . 0 0 
+0 0 0 . . . . . . . . . . . . . 0 
+0 0 . . . . . 0 0 0 . . . . . 0 0 
+0 . . . . . . 0 0 0 . . . . . . 0 
+0 0 . . . . . 0 0 . . . . . . 0 0 
+0 . . . . . . . . . . . . . 0 0 0 
+0 0 . . . . . . . . . . . 0 0 . 0 
+0 . 0 . . . . . . . . . 0 0 . 0 0 
+0 0 . 0 . . . . . . . 0 0 . 0 . 0 
+0 . 0 . 0 . . . . . 0 0 . 0 . 0 0 
+0 0 . 0 . 0 . 0 . 0 0 . 0 . 0 . 0 
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 
+Other tests using basic circular SE:
+. 0 0 0 . 
+0 0 0 0 0 
+0 0 0 0 0 
+0 0 0 0 0 
+. 0 0 0 . 
+	Device memory contains _3_ cudaImageDevice objects
+		Device Image   0 (ID=108):   256 x  256,      0.2500 MB
+		Device Image   1 (ID=109):    17 x   17,      0.0011 MB
+		Device Image   2 (ID=110):   256 x  256,      0.2500 MB
+		-------------------------------------------------------
+		Total Device Memory Used:                     0.5011 MB
+
+*******************************************************************************
+***Testing ImageWorkbench basic operations
+
+Adding unique SE to list
+H H H H H H H H H H H H H H H H H 
+H H H H . H . H H H . H . H . H H 
+H H H H . . . . . . . . . . H . H 
+H H H H . . . . . . . . . H . H H 
+H H H H . . . . . . . . H . . . H 
+H H H H . . . . . . . H . . . H H 
+H H H . . . . . . . . . . . . . H 
+H H . . . . . H H H . . . . . H H 
+H . . . . . . H H H . . . . . . H 
+H H . . . . . H H . . . . . . H H 
+H . . . . . . . . . . . . . H H H 
+H H . . . . . . . . . . . H H . H 
+H . H . . . . . . . . . H H . H H 
+H H . H . . . . . . . H H . H . H 
+H . H . H . . . . . H H . H . H H 
+H H . H . H . H . H H . H . H . H 
+H H H H H H H H H H H H H H H H H 
+Adding circular SE to list
+. . . H H H H H . . . 
+. . H H H H H H H . . 
+. H H H H H H H H H . 
+H H H H H H H H H H H 
+H H H H H H H H H H H 
+H H H H H H H H H H H 
+H H H H H H H H H H H 
+H H H H H H H H H H H 
+. H H H H H H H H H . 
+. . H H H H H H H . . 
+. . . H H H H H . . . 
+Adding rectangular SE to list
+H H H H H . H . H 
+H H H H H H . H . 
+H H H H H . H . H 
+H H H H H H . H . 
+H H H H H . . . H 
+	Device memory contains _3_ cudaImageDevice objects
+		Device Image   0 (ID=114):    17 x   17,      0.0011 MB
+		Device Image   1 (ID=115):    11 x   11,      0.0004 MB
+		Device Image   2 (ID=116):     5 x    9,      0.0001 MB
+		-------------------------------------------------------
+		Total Device Memory Used:                     0.0017 MB
+
+Copying unaltered image back to host for verification
+Dilating with 11x11 circle
+Performing simple 3x3 erode
+Try a closing operation
+Testing subtract kernel
+
+Checking device memory usage so far: 
+	Device memory contains _11_ cudaImageDevice objects
+		Device Image   0 (ID=114):    17 x   17,      0.0011 MB
+		Device Image   1 (ID=115):    11 x   11,      0.0004 MB
+		Device Image   2 (ID=116):     5 x    9,      0.0001 MB
+		Device Image   3 (ID=117):   256 x  256,      0.2500 MB
+		Device Image   4 (ID=118):   256 x  256,      0.2500 MB
+		Device Image   5 (ID=119):   256 x  256,      0.2500 MB
+		Device Image   6 (ID=120):   256 x  256,      0.2500 MB
+		Device Image   7 (ID=121):   256 x  256,      0.2500 MB
+		Device Image   8 (ID=122):   256 x  256,      0.2500 MB
+		Device Image   9 (ID=123):     3 x    3,      0.0000 MB
+		Device Image  10 (ID=124):   256 x  256,      0.2500 MB
+		-------------------------------------------------------
+		Total Device Memory Used:                     1.7517 MB
+
+
+Time to solve a maze! 
+
+	Thinning sweep 2x
+	Thinning sweep til complete
+	Pruning sweep 1-5
+	Pruning sweep 6-20
+	Pruning sweep until complete
+Finished the maze!  Total operations: 
+	9 thinning sweeps and 
+	471 pruning sweeps
+	Total of 3840 HitOrMiss operations and the same number of subtract operations
+
+	Device memory contains _16_ cudaImageDevice objects
+		Device Image   0 (ID=114):    17 x   17,      0.0011 MB
+		Device Image   1 (ID=115):    11 x   11,      0.0004 MB
+		Device Image   2 (ID=116):     5 x    9,      0.0001 MB
+		Device Image   3 (ID=117):   256 x  256,      0.2500 MB
+		Device Image   4 (ID=118):   256 x  256,      0.2500 MB
+		Device Image   5 (ID=119):   256 x  256,      0.2500 MB
+		Device Image   6 (ID=120):   256 x  256,      0.2500 MB
+		Device Image   7 (ID=121):   256 x  256,      0.2500 MB
+		Device Image   8 (ID=122):   256 x  256,      0.2500 MB
+		Device Image   9 (ID=123):     3 x    3,      0.0000 MB
+		Device Image  10 (ID=124):   256 x  256,      0.2500 MB
+		Device Image  11 (ID=125):   512 x  512,      1.0000 MB
+		Device Image  12 (ID=126):   512 x  512,      1.0000 MB
+		Device Image  13 (ID=130):   512 x  512,      1.0000 MB
+		Device Image  14 (ID=131):   512 x  512,      1.0000 MB
+		Device Image  15 (ID=132):   512 x  512,      1.0000 MB
+		-------------------------------------------------------
+		Total Device Memory Used:                     6.7517 MB
+
+Finished IWB testing!
+*******************************************************************************
+
+
+*******************************************************************************
+***Executing timing tests...
+	Now allocate a 4096x4096 images and move them around:
+		Allocating 64MB in device memory took 0.09 ms (738007 MB/s)
+		Copying 64MB from HOST to DEVICE took 23.80 ms (2689 MB/s)
+		Copying 64MB from DEVICE to HOST took 63.34 ms (1010 MB/s)
+		Copying 64MB within DEVICE took 2.32 ms (27536 MB/s)
+
+
+		Allocating 64MB in HOST memory took 0.01 ms (4571428 MB/s)
+		Copying 64MB within HOST took 60.28 ms (1062 MB/s)
+
+
+*******************************************************************************
+***Timing a variety of morphological median calculations...
+	Morph  256x 256 image with optimized 3x3:     (real ms, gpu ms, FPS) = (0.06, 0.06, 16863.4 FPS)
+	Morph  256x 256 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (0.09, 0.09; 11086.5 FPS)
+	Morph  256x 256 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (0.12, 0.12; 8196.7 FPS)
+	Morph  256x 256 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (0.18, 0.18; 5537.1 FPS)
+	Morph  256x 256 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (0.24, 0.24; 4140.8 FPS)
+	Morph  256x 256 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (0.31, 0.31; 3212.3 FPS)
+	Morph  256x 256 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (0.40, 0.40; 2513.8 FPS)
+	Morph  256x 256 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (0.51, 0.51; 1974.3 FPS)
+	Morph  256x 256 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (0.76, 0.76; 1321.9 FPS)
+	Mask  UNION            two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 71428.6 FPS)
+	Mask  INTERSECT        two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 79365.1 FPS)
+	Mask  SUBTRACT         two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 68965.5 FPS)
+	Mask  INVERT           one  256x 256 image:   (real ms, gpu ms, FPS) = (0.01, 0.01; 101010.1 FPS)
+	Mask  DIFFERENCE       two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 80000.0 FPS)
+	Image REDUCTION SUM    one  256x 256 image:   (real ms, gpu ms, FPS) = (0.05, 0.05; 19342.4 FPS)
+		sum=32768 (should be 32768)
+
+
+	Morph  512x 512 image with optimized 3x3:     (real ms, gpu ms, FPS) = (0.22, 0.22, 4589.3 FPS)
+	Morph  512x 512 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (0.34, 0.34; 2902.8 FPS)
+	Morph  512x 512 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (0.47, 0.47; 2118.2 FPS)
+	Morph  512x 512 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (0.71, 0.71; 1414.4 FPS)
+	Morph  512x 512 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (0.95, 0.95; 1053.7 FPS)
+	Morph  512x 512 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (1.23, 1.23; 815.1 FPS)
+	Morph  512x 512 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (1.59, 1.59; 629.6 FPS)
+	Morph  512x 512 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (2.00, 2.00; 498.9 FPS)
+	Morph  512x 512 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (2.94, 2.94; 339.6 FPS)
+	Mask  UNION            two  512x 512 images:  (real ms, gpu ms, FPS) = (0.04, 0.04; 23201.9 FPS)
+	Mask  INTERSECT        two  512x 512 images:  (real ms, gpu ms, FPS) = (0.04, 0.04; 23419.2 FPS)
+	Mask  SUBTRACT         two  512x 512 images:  (real ms, gpu ms, FPS) = (0.05, 0.05; 20491.8 FPS)
+	Mask  INVERT           one  512x 512 image:   (real ms, gpu ms, FPS) = (0.03, 0.03; 31446.5 FPS)
+	Mask  DIFFERENCE       two  512x 512 images:  (real ms, gpu ms, FPS) = (0.04, 0.04; 23310.0 FPS)
+	Image REDUCTION SUM    one  512x 512 image:   (real ms, gpu ms, FPS) = (0.12, 0.12; 8298.8 FPS)
+		sum=131072 (should be 131072)
+
+
+	Morph 1024x1024 image with optimized 3x3:     (real ms, gpu ms, FPS) = (0.86, 0.86, 1168.8 FPS)
+	Morph 1024x1024 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (1.36, 1.36; 734.3 FPS)
+	Morph 1024x1024 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (1.88, 1.88; 532.8 FPS)
+	Morph 1024x1024 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (2.80, 2.80; 357.2 FPS)
+	Morph 1024x1024 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (3.77, 3.76; 265.6 FPS)
+	Morph 1024x1024 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (4.88, 4.88; 204.9 FPS)
+	Morph 1024x1024 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (6.30, 6.30; 158.6 FPS)
+	Morph 1024x1024 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (7.96, 7.96; 125.7 FPS)
+	Morph 1024x1024 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (11.69, 11.69; 85.6 FPS)
+	Mask  UNION            two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.17, 0.17; 6002.4 FPS)
+	Mask  INTERSECT        two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.17, 0.17; 6049.6 FPS)
+	Mask  SUBTRACT         two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.19, 0.19; 5376.3 FPS)
+	Mask  INVERT           one 1024x1024 image:   (real ms, gpu ms, FPS) = (0.12, 0.12; 8453.1 FPS)
+	Mask  DIFFERENCE       two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.17, 0.17; 6053.3 FPS)
+	Image REDUCTION SUM    one 1024x1024 image:   (real ms, gpu ms, FPS) = (0.40, 0.40; 2483.2 FPS)
+		sum=524288 (should be 524288)
+
+
+	Morph 2048x2048 image with optimized 3x3:     (real ms, gpu ms, FPS) = (3.37, 3.37, 296.8 FPS)
+	Morph 2048x2048 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (5.42, 5.43; 184.4 FPS)
+	Morph 2048x2048 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (7.46, 7.46; 134.1 FPS)
+	Morph 2048x2048 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (11.14, 11.14; 89.7 FPS)
+	Morph 2048x2048 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (15.01, 15.00; 66.6 FPS)
+	Morph 2048x2048 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (19.42, 19.43; 51.5 FPS)
+	Morph 2048x2048 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (25.06, 25.05; 39.9 FPS)
+	Morph 2048x2048 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (31.73, 31.72; 31.5 FPS)
+	Morph 2048x2048 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (46.62, 46.61; 21.4 FPS)
+	Mask  UNION            two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.65, 0.65; 1529.8 FPS)
+	Mask  INTERSECT        two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.65, 0.65; 1530.5 FPS)
+	Mask  SUBTRACT         two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.73, 0.73; 1365.0 FPS)
+	Mask  INVERT           one 2048x2048 image:   (real ms, gpu ms, FPS) = (0.46, 0.46; 2154.7 FPS)
+	Mask  DIFFERENCE       two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.65, 0.65; 1528.4 FPS)
+	Image REDUCTION SUM    one 2048x2048 image:   (real ms, gpu ms, FPS) = (1.49, 1.49; 669.8 FPS)
+		sum=2097152 (should be 2097152)
+
+
+
+
+
+
+*******************************************************************************
+***Timing tests on different block sizes, 1024x1024 image with 7x7 SE
+
+	Block size = (16,16), Grid size = ( 64, 64), CPU Timing:  2.58 ms -- 387.5 FPS
+	Block size = (32, 8), Grid size = ( 32,128), CPU Timing:  2.96 ms -- 338.1 FPS
+	Block size = ( 8,32), Grid size = (128, 32), CPU Timing:  2.80 ms -- 357.2 FPS
+	Block size = (16,32), Grid size = ( 64, 32), CPU Timing:  2.73 ms -- 365.7 FPS
+	Block size = (32,16), Grid size = ( 32, 64), CPU Timing:  2.92 ms -- 342.0 FPS
+	Block size = (16, 8), Grid size = ( 64,128), CPU Timing:  2.91 ms -- 343.2 FPS
+	Block size = ( 8,16), Grid size = (128, 64), CPU Timing:  2.93 ms -- 341.9 FPS
+	Block size = ( 8, 8), Grid size = (128,128), CPU Timing:  4.87 ms -- 205.1 FPS
+
+
+*******************************************************************************
+
+***Test a few of the same operations with the workbench
+	Workbench  512x 512 with optimized 3x3:     (real ms, gpu ms, FPS) = (0.22, 0.22; 4599.8 FPS)
+	Workbench  512x 512 with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (0.71, 0.71; 1415.0 FPS)
+	Workbench  512x 512 with 15x15 struct elt:  (real ms, gpu ms, FPS) = (2.00, 2.00; 500.6 FPS)
+	Reduction SUM on a  512x 512 image:  (real ms, gpu ms, FPS) = (0.15, 0.15; 6779.7 FPS)
+	sum=131072   (should be 131072)
+
+	Workbench 2048x2048 with optimized 3x3:     (real ms, gpu ms, FPS) = (3.37, 3.37; 296.9 FPS)
+	Workbench 2048x2048 with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (11.14, 11.14; 89.8 FPS)
+	Workbench 2048x2048 with 15x15 struct elt:  (real ms, gpu ms, FPS) = (31.70, 31.70; 31.5 FPS)
+	Reduction SUM on a 2048x2048 image:  (real ms, gpu ms, FPS) = (1.59, 1.59; 627.5 FPS)
+	sum=2097152   (should be 2097152)
+
+
+

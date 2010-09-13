@@ -7,7 +7,6 @@
 #include "cudaConvUtilities.h.cu"
 #include "cudaConvolution.h.cu"
 #include "cudaMorphology.h.cu"
-#include "cudaStructElt.h.cu"
 #include "cudaImageHost.h"
 #include "cudaImageDevice.h.cu"
 
@@ -35,8 +34,8 @@
       Morph3x3_##name##_Kernel<<<GRID_2D_,BLOCK_2D_>>>(  \
                         srcPtr,    \
                         dstPtr,    \
-                        imgCols_,  \
-                        imgRows_); \
+                        imgRows_,  \
+                        imgCols_); \
    } \
    void name( ) \
    {  \
@@ -53,8 +52,8 @@
       Morph3x3_##name##_Kernel<<<GRID_2D_,BLOCK_2D_>>>( \
                         srcPtr,    \
                         dstPtr,    \
-                        imgCols_,  \
-                        imgRows_); \
+                        imgRows_,  \
+                        imgCols_); \
    } \
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -157,8 +156,8 @@ class ImageWorkbench
 private:
 
    // All buffers in a workbench are the same size
-   unsigned int imgCols_;
    unsigned int imgRows_;
+   unsigned int imgCols_;
    unsigned int imgElts_;
    unsigned int imgBytes_;
 
@@ -216,7 +215,7 @@ public:
    ImageWorkbench(cudaImageHost const & hostImg);
 
    // IWB maintains a static list of all SEs, and we access them by index
-   static int addStructElt(int* hostSE, int ncols, int nrows);
+   static int addStructElt(int* hostSE, int nRows, int nCols);
    static int addStructElt(cudaImageHost const & seHost);
 
    static cudaImageDevice const * getStructEltPtr(int i) {return &masterListSE_[i];}
@@ -231,7 +230,7 @@ public:
 
    // GPU Kernel geometry
    void setBlockSize1D(int nthreads);
-   void setBlockSize2D(int ncols, int nrows);
+   void setBlockSize2D(int nRows, int nCols);
 
    dim3 getBlockSize1D(void) const {return BLOCK_1D_;}
    dim3 getBlockSize2D(void) const {return BLOCK_2D_;}

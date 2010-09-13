@@ -7,14 +7,14 @@ int cudaImageDevice::totalDevMemUsed_ = 0;
 
 
 ////////////////////////////////////////////////////////////////////////////////
-void cudaImageDevice::Allocate(int ncols, int nrows)
+void cudaImageDevice::Allocate(int nRows, int nCols)
 {
-   imgCols_ = ncols;
-   imgRows_ = nrows;
-   imgElts_ = imgCols_*imgRows_;
+   imgRows_ = nRows;
+   imgCols_ = nCols;
+   imgElts_ = imgRows_*imgCols_;
    imgBytes_ = imgElts_*sizeof(int);
 
-   if(ncols == 0 || nrows == 0)
+   if(nRows == 0 || nCols == 0)
       imgData_ = NULL;
    else
    {
@@ -45,22 +45,22 @@ void cudaImageDevice::Deallocate(void)
       }
    } 
    imgData_ = NULL;
-   imgCols_ = imgRows_ = imgElts_ = imgBytes_ = 0;
+   imgRows_ = imgCols_ = imgElts_ = imgBytes_ = 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void cudaImageDevice::resize(int ncols, int nrows)
+void cudaImageDevice::resize(int nRows, int nCols)
 {
-   if( imgElts_ == ncols*nrows)
+   if( imgElts_ == nRows*nCols)
    {
       // imgElts_ and imgBytes_ is already correct, no need to realloc
-      imgCols_ = ncols;
-      imgRows_ = nrows;
+      imgRows_ = nRows;
+      imgCols_ = nCols;
    }
    else
    {
       Deallocate();
-      Allocate(ncols, nrows);
+      Allocate(nRows, nCols);
    }
 }
 
@@ -72,26 +72,26 @@ cudaImageDevice::~cudaImageDevice()
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageDevice::cudaImageDevice() :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0) { }
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0) { }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageDevice::cudaImageDevice(int ncols, int nrows) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+cudaImageDevice::cudaImageDevice(int nRows, int nCols) :
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
-   Allocate(ncols, nrows);
+   Allocate(nRows, nCols);
 }
 
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageDevice::cudaImageDevice(cudaImageHost const & hostImg) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
    copyFromHost(hostImg);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageDevice::cudaImageDevice(cudaImageDevice const & devImg) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
    copyFromDevice(devImg);
 }
@@ -120,16 +120,16 @@ cudaImageDevice::cudaImageDevice(cudaImageDevice const & devImg) :
 ////////////////////////////////////////////////////////////////////////////////
 // HOST <---> DEVICE 
 /////
-void cudaImageDevice::copyFromHost  (int* hostPtr, int ncols, int nrows)
+void cudaImageDevice::copyFromHost  (int* hostPtr, int nRows, int nCols)
 {
-   resize(ncols, nrows);
+   resize(nRows, nCols);
    cudaMemcpy(imgData_, hostPtr, imgBytes_, cudaMemcpyHostToDevice);
 }
 
 /////
 void cudaImageDevice::copyFromHost  (cudaImageHost const & hostImg)
 {
-   copyFromHost(hostImg.getDataPtr(), hostImg.numCols(), hostImg.numRows());
+   copyFromHost(hostImg.getDataPtr(), hostImg.numRows(), hostImg.numCols());
 }
 
 /////
@@ -141,23 +141,23 @@ void cudaImageDevice::copyToHost(int* hostPtr) const
 /////
 void cudaImageDevice::copyToHost(cudaImageHost & hostImg) const
 {
-   hostImg.resize(imgCols_, imgRows_);
+   hostImg.resize(imgRows_, imgCols_);
    copyToHost(hostImg.getDataPtr());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // DEVICE <---> DEVICE 
 /////
-void cudaImageDevice::copyFromDevice(int* devicePtr, int ncols, int nrows)
+void cudaImageDevice::copyFromDevice(int* devicePtr, int nRows, int nCols)
 {
-   resize(ncols, nrows);
+   resize(nRows, nCols);
    cudaMemcpy(imgData_, devicePtr, imgBytes_, cudaMemcpyDeviceToDevice);
 }
 
 /////
 void cudaImageDevice::copyFromDevice(cudaImageDevice const & devImg)
 {
-   copyFromDevice(devImg.getDataPtr(), devImg.numCols(), devImg.numRows());
+   copyFromDevice(devImg.getDataPtr(), devImg.numRows(), devImg.numCols());
 }
 
 /////
@@ -169,7 +169,7 @@ void cudaImageDevice::copyToDevice(int* devPtr) const
 /////
 void cudaImageDevice::copyToDevice(cudaImageDevice & devImg) const
 {
-   devImg.resize(imgCols_, imgRows_);
+   devImg.resize(imgRows_, imgCols_);
    copyToDevice(devImg.getDataPtr());
 }
 
@@ -197,7 +197,7 @@ int cudaImageDevice::calculateDeviceMemoryUsage(bool dispStdout)
       int wholeMB = nbytes / sizeMB;
       int fracMB  = (int)(10000 * (float)(nbytes - wholeMB*sizeMB) / (float)sizeMB);
       if(dispStdout)
-         printf("\t\tDevice Image %3d (ID=%03d):  %4d x %4d,   %4d.%04d MB\n", ct, (*it)->id_, (*it)->imgCols_, (*it)->imgRows_, wholeMB, fracMB);
+         printf("\t\tDevice Image %3d (ID=%03d):  %4d x %4d,   %4d.%04d MB\n", ct, (*it)->id_, (*it)->imgRows_, (*it)->imgCols_, wholeMB, fracMB);
                                    
       ct++;
 

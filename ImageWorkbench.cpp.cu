@@ -15,15 +15,15 @@ vector<int>             ImageWorkbench::masterListSENZ_(0);
 
 /////////////////////////////////////////////////////////////////////////////
 // Add the SE to the master list, calculate non-zero count, and return index
-int ImageWorkbench::addStructElt(int* seHostPtr, int ncols, int nrows)
+int ImageWorkbench::addStructElt(int* seHostPtr, int nRows, int nCols)
 {
    int newIndex = (int)masterListSE_.size();
    cudaImageDevice seDev;
    masterListSE_.push_back( seDev );
-   masterListSE_[newIndex].copyFromHost(seHostPtr, ncols, nrows);
+   masterListSE_[newIndex].copyFromHost(seHostPtr, nRows, nCols);
    
    int nonZeroCount = 0;
-   for(int e=0; e<ncols*nrows; e++)
+   for(int e=0; e<nRows*nCols; e++)
       if(seHostPtr[e] == 1 || seHostPtr[e] == -1)
          nonZeroCount++;
 
@@ -34,7 +34,7 @@ int ImageWorkbench::addStructElt(int* seHostPtr, int ncols, int nrows)
 /////////////////////////////////////////////////////////////////////////////
 int ImageWorkbench::addStructElt(cudaImageHost const & seHost)
 {
-   return addStructElt(seHost.getDataPtr(), seHost.numCols(), seHost.numRows());
+   return addStructElt(seHost.getDataPtr(), seHost.numRows(), seHost.numCols());
 }
 
 
@@ -45,10 +45,10 @@ void ImageWorkbench::setBlockSize1D(int nthreads)
    GRID_1D_  = dim3(imgElts_/BLOCK_1D_.x, 1, 1);
 }
 /////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::setBlockSize2D(int ncols, int nrows)
+void ImageWorkbench::setBlockSize2D(int nRows, int nCols)
 {
-   BLOCK_2D_ = dim3(ncols, nrows, 1);
-   GRID_2D_  = dim3(imgCols_/BLOCK_2D_.x, imgRows_/BLOCK_2D_.y, 1);
+   BLOCK_2D_ = dim3(nRows, nCols, 1);
+   GRID_2D_  = dim3(imgRows_/BLOCK_2D_.x, imgCols_/BLOCK_2D_.y, 1);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -57,7 +57,7 @@ void ImageWorkbench::createExtraBuffer(void)
    int newIndex = (int)extraBuffers_.size();
    cudaImageDevice newBuf;
    extraBuffers_.push_back(newBuf);
-   extraBuffers_[newIndex].resize(imgCols_, imgRows_);
+   extraBuffers_[newIndex].resize(imgRows_, imgCols_);
 }
 
 /////////////////////////////////////////////////////////////////////////////
@@ -73,7 +73,7 @@ void ImageWorkbench::createTempBuffer(void)
 
    cudaImageDevice newBuf;
    tempBuffers_.push_back(newBuf);
-   tempBuffers_[newIndex].resize(imgCols_, imgRows_);
+   tempBuffers_[newIndex].resize(imgRows_, imgCols_);
 
    // Make sure there are as many flags as there are buffers
    tempBuffersLockFlag_.push_back(false);
@@ -88,8 +88,8 @@ void ImageWorkbench::deleteTempBuffer(void)
 
 /////////////////////////////////////////////////////////////////////////////
 ImageWorkbench::ImageWorkbench() : 
-   imgCols_(0),
    imgRows_(0),
+   imgCols_(0),
    imgElts_(0),
    imgBytes_(0),
    buffer1_(0,0),
@@ -100,8 +100,8 @@ ImageWorkbench::ImageWorkbench() :
 
 
 ImageWorkbench::ImageWorkbench(cudaImageHost const & hostImg) :
-   imgCols_(0),
    imgRows_(0),
+   imgCols_(0),
    imgElts_(0),
    imgBytes_(0),
    buffer1_(0,0),
@@ -115,8 +115,8 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
 {
 
 
-   imgCols_  = hostImg.numCols();
    imgRows_  = hostImg.numRows();
+   imgCols_  = hostImg.numCols();
    imgElts_  = hostImg.numElts();
    imgBytes_ = hostImg.numBytes();
    
@@ -132,7 +132,7 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    /*
    cout << endl;
    cout << "***Initializing new ImageWorkbench object" << endl;
-   printf("\tImage Size (numCols, numRows) == (%d, %d)\n", imgCols_, imgRows_);
+   printf("\tImage Size (numRows, numCols) == (%d, %d)\n", imgRows_, imgCols_);
    printf("\tEach buffer is %d bytes\n\n", imgBytes_);
    printf("\t1D block size is (%d, %d, %d)\n", BLOCK_1D_.x, BLOCK_1D_.y, BLOCK_1D_.z);
    printf("\t1D grid  size is (%d, %d, %d)\n", GRID_1D_.x,  GRID_1D_.y,  GRID_1D_.z);
@@ -146,7 +146,7 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    tempBuffersLockFlag_  = vector<bool>(0);
 
    buffer1_.copyFromHost(hostImg);
-   buffer2_.resize(imgCols_, imgRows_);
+   buffer2_.resize(imgRows_, imgCols_);
 
    // BufferA is input for a morph op, BufferB is the target, then switch
    bufferPtrA_ = &buffer1_;
@@ -202,12 +202,12 @@ void ImageWorkbench::copyBufferToDevice( int bufIdx,
 void ImageWorkbench::copyHostToBuffer( cudaImageHost const & hostIn,
                                        int bufIdx)
 {
-   if(hostIn.numCols() == imgCols_ && hostIn.numRows() == imgRows_)
+   if(hostIn.numRows() == imgRows_ && hostIn.numCols() == imgCols_)
       getBufferPtr(bufIdx)->copyFromHost(hostIn);
    else
    {
       printf("***ERROR:  can only copy images of same size as workbench (%dx%d)",
-                                    imgCols_, imgRows_);
+                                    imgRows_, imgCols_);
    }
 }
 
@@ -215,12 +215,12 @@ void ImageWorkbench::copyHostToBuffer( cudaImageHost const & hostIn,
 void ImageWorkbench::copyDeviceToBuffer( cudaImageDevice const & devIn,
                                          int bufIdx)
 {
-   if(devIn.numCols() == imgCols_ && devIn.numRows() == imgRows_)
+   if(devIn.numRows() == imgRows_ && devIn.numCols() == imgCols_)
       getBufferPtr(bufIdx)->copyFromDevice(devIn);
    else
    {
       printf("***ERROR:  can only copy images of same size as workbench (%dx%d)",
-                                    imgCols_, imgRows_);
+                                    imgRows_, imgCols_);
    }
 }
 
@@ -323,11 +323,11 @@ void ImageWorkbench::GenericMorphOp(int seIndex, int targSum, int srcBuf, int ds
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
                   getBufferPtr(dstBuf)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
-                  se->numRows()/2,
+                  se->numRows()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numCols()/2,
                   targSum);
 }
 
@@ -339,11 +339,11 @@ void ImageWorkbench::HitOrMiss(int seIndex, int srcBuf, int dstBuf)
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
                   getBufferPtr(dstBuf)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,
                   se->numRows()/2,
+                  se->numCols()/2,
                   masterListSENZ_[seIndex]);
 }
 
@@ -366,11 +366,11 @@ void ImageWorkbench::Dilate(int seIndex, int srcBuf, int dstBuf)
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
                   getBufferPtr(dstBuf)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,
                   se->numRows()/2,
+                  se->numCols()/2,
                   -masterListSENZ_[seIndex]+1);
 }
 
@@ -382,11 +382,11 @@ void ImageWorkbench::Median(int seIndex, int srcBuf, int dstBuf)
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
                   getBufferPtr(dstBuf)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,
                   se->numRows()/2,
+                  se->numCols()/2,
                   0);
 }
 
@@ -467,7 +467,7 @@ int ImageWorkbench::ZSumImage(int bufIdx)
 {
    // Yes, it seems silly to use two temp buffers to sum up an image, but
    // my goal was to make the reduction-kernel simple with the log(n) order of
-   // growth, but not necessarily space-efficient
+   // gColth, but not necessarily space-efficient
 
    // Also, if we are trying to sum a temp buffer here, we don't want to
    // overwrite when getting more temp buffers
@@ -559,11 +559,11 @@ void ImageWorkbench::ZGenericMorphOp(int seIndex, int targSum, int srcBuf, int d
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
                   getBufPtrAny(dstBuf, true)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
-                  se->numRows()/2,
+                  se->numRows()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numCols()/2,
                   targSum);
 }
 
@@ -575,11 +575,11 @@ void ImageWorkbench::ZHitOrMiss(int seIndex,  int srcBuf, int dstBuf)
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
                   getBufPtrAny(dstBuf, true)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
-                  se->numRows()/2,
+                  se->numRows()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numCols()/2,
                   masterListSENZ_[seIndex]);
 }
 
@@ -602,11 +602,11 @@ void ImageWorkbench::ZDilate(int seIndex, int srcBuf, int dstBuf)
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
                   getBufPtrAny(dstBuf, true)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
-                  se->numRows()/2,
+                  se->numRows()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numCols()/2,
                   -masterListSENZ_[seIndex]+1);
 }
 
@@ -618,11 +618,11 @@ void ImageWorkbench::ZMedian(int seIndex, int srcBuf, int dstBuf)
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
                   getBufPtrAny(dstBuf, true)->getDataPtr(),
-                  imgCols_,
                   imgRows_,
+                  imgCols_,
                   se->getDataPtr(),
-                  se->numCols()/2,  // pass in radius, not diam (yeah, confusing)
-                  se->numRows()/2,
+                  se->numRows()/2,  // pass in radius, not diam (yeah, confusing)
+                  se->numCols()/2,
                   0);
 }
 

@@ -9,9 +9,9 @@
 #include <stopwatch.h>
 #include "cudaImageHost.h"
 
-#define IDX_1D(col, row, stride) ((col * stride) + row)
-#define COL_2D(index, stride) (index / stride)
-#define ROW_2D(index, stride) (index % stride)
+#define IDX_1D(Row, Col, stride) ((Row * stride) + Col)
+#define ROW_2D(index, stride) (index / stride)
+#define COL_2D(index, stride) (index % stride)
 #define ROUNDUP32(integer) ( ((integer-1)/32 + 1) * 32 )
 
 #define SHMEM 8192
@@ -29,23 +29,23 @@ using namespace std;
 // ***This is actually the same as the CONVOLVE version
 //
 ////////////////////////////////////////////////////////////////////////////////
-#define CREATE_CONVOLUTION_VARIABLES(psfColRad, psfRowRad) \
+#define CREATE_CONVOLUTION_VARIABLES(psfRowRad, psfColRad) \
 \
-   const int cornerCol = blockDim.x*blockIdx.x;   \
-   const int cornerRow = blockDim.y*blockIdx.y;   \
-   const int globalCol = cornerCol + threadIdx.x;   \
-   const int globalRow = cornerRow + threadIdx.y;   \
-   const int globalIdx = IDX_1D(globalCol, globalRow, imgRows);   \
+   const int cornerRow = blockDim.x*blockIdx.x;   \
+   const int cornerCol = blockDim.y*blockIdx.y;   \
+   const int globalRow = cornerRow + threadIdx.x;   \
+   const int globalCol = cornerCol + threadIdx.y;   \
+   const int globalIdx = IDX_1D(globalRow, globalCol, imgCols);   \
 \
-   const int localCol    = threadIdx.x;   \
-   const int localRow    = threadIdx.y;   \
-   const int localIdx    = IDX_1D(localCol, localRow, blockDim.y);   \
+   const int localRow    = threadIdx.x;   \
+   const int localCol    = threadIdx.y;   \
+   const int localIdx    = IDX_1D(localRow, localCol, blockDim.y);   \
    const int localPixels = blockDim.x*blockDim.y;   \
 \
-   const int padRectStride = blockDim.y + 2*psfRowRad;   \
-   const int padRectCol    = localCol + psfColRad;   \
+   const int padRectStride = blockDim.y + 2*psfColRad;   \
    const int padRectRow    = localRow + psfRowRad;   \
-   const int padRectPixels = padRectStride * (blockDim.x + 2*psfColRad);   \
+   const int padRectCol    = localCol + psfColRad;   \
+   const int padRectPixels = padRectStride * (blockDim.x + 2*psfRowRad);   \
 \
    __shared__ char sharedMem[8192]; \
    int* shmPadRect  = (int*)sharedMem;   \
@@ -59,7 +59,7 @@ using namespace std;
 // convolution
 //
 ////////////////////////////////////////////////////////////////////////////////
-#define PREPARE_PADDED_RECTANGLE(psfColRad, psfRowRad) \
+#define PREPARE_PADDED_RECTANGLE(psfRowRad, psfColRad) \
 \
    nLoop = (padRectPixels/localPixels)+1;   \
    for(int loopIdx=0; loopIdx<nLoop; loopIdx++)   \
@@ -67,12 +67,12 @@ using namespace std;
       int prIndex = loopIdx*localPixels + localIdx;   \
       if(prIndex < padRectPixels)   \
       {   \
-         int prCol = COL_2D(prIndex, padRectStride);   \
          int prRow = ROW_2D(prIndex, padRectStride);   \
-         int glCol = cornerCol + prCol - psfColRad;   \
+         int prCol = COL_2D(prIndex, padRectStride);   \
          int glRow = cornerRow + prRow - psfRowRad;   \
-         int glIdx = IDX_1D(glCol, glRow, imgRows);   \
-         if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
+         int glCol = cornerCol + prCol - psfColRad;   \
+         int glIdx = IDX_1D(glRow, glCol, imgCols);   \
+         if(glCol>=0 && glCol<imgCols && glRow>=0 && glRow<imgRows)   \
             shmPadRect[prIndex] = devInPtr[glIdx];   \
          else   \
             shmPadRect[prIndex] = 0; \
@@ -89,7 +89,7 @@ using namespace std;
 // before copying out the result
 //
 ////////////////////////////////////////////////////////////////////////////////
-#define PREPARE_PADDED_RECTANGLE_MORPH(psfColRad, psfRowRad) \
+#define PREPARE_PADDED_RECTANGLE_MORPH(psfRowRad, psfColRad) \
 \
    nLoop = (padRectPixels/localPixels)+1;   \
    for(int loopIdx=0; loopIdx<nLoop; loopIdx++)   \
@@ -97,12 +97,12 @@ using namespace std;
       int prIndex = loopIdx*localPixels + localIdx;   \
       if(prIndex < padRectPixels)   \
       {   \
-         int prCol = COL_2D(prIndex, padRectStride);   \
          int prRow = ROW_2D(prIndex, padRectStride);   \
-         int glCol = cornerCol + prCol - psfColRad;   \
+         int prCol = COL_2D(prIndex, padRectStride);   \
          int glRow = cornerRow + prRow - psfRowRad;   \
-         int glIdx = IDX_1D(glCol, glRow, imgRows);   \
-         if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
+         int glCol = cornerCol + prCol - psfColRad;   \
+         int glIdx = IDX_1D(glRow, glCol, imgCols);   \
+         if(glCol>=0 && glCol<imgCols && glRow>=0 && glRow<imgRows)   \
             shmPadRect[prIndex] = devInPtr[glIdx]*2 - 1;   \
          else   \
             shmPadRect[prIndex] = -1; \
@@ -141,8 +141,8 @@ using namespace std;
 __global__ void  Morph3x3_##name##_Kernel(       \
                int*   devInPtr,          \
                int*   devOutPtr,          \
-               int    imgCols,          \
-               int    imgRows);
+               int    imgRows,          \
+               int    imgCols);
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -165,23 +165,23 @@ __global__ void  Morph3x3_##name##_Kernel(       \
 __global__ void  Morph3x3_##name##_Kernel(       \
                int*   devInPtr,          \
                int*   devOutPtr,          \
-               int    imgCols,          \
-               int    imgRows)  \
+               int    imgRows,          \
+               int    imgCols)  \
 { \
-   const int cornerCol = blockDim.x*blockIdx.x;   \
-   const int cornerRow = blockDim.y*blockIdx.y;   \
-   const int globalCol = cornerCol + threadIdx.x;   \
-   const int globalRow = cornerRow + threadIdx.y;   \
-   const int globalIdx = IDX_1D(globalCol, globalRow, imgRows);   \
+   const int cornerRow = blockDim.x*blockIdx.x;   \
+   const int cornerCol = blockDim.y*blockIdx.y;   \
+   const int globalRow = cornerRow + threadIdx.x;   \
+   const int globalCol = cornerCol + threadIdx.y;   \
+   const int globalIdx = IDX_1D(globalRow, globalCol, imgCols);   \
 \
-   const int localCol    = threadIdx.x;   \
-   const int localRow    = threadIdx.y;   \
-   const int localIdx    = IDX_1D(localCol, localRow, blockDim.y);   \
+   const int localRow    = threadIdx.x;   \
+   const int localCol    = threadIdx.y;   \
+   const int localIdx    = IDX_1D(localRow, localCol, blockDim.y);   \
    const int localPixels = blockDim.x*blockDim.y;   \
 \
    const int padRectStride = blockDim.y + 2; \
-   const int padRectCol    = localCol + 1;   \
    const int padRectRow    = localRow + 1;   \
+   const int padRectCol    = localCol + 1;   \
 \
    __shared__ char sharedMem[SHMEM];   \
    int* shmPadRect  = (int*)sharedMem;   \
@@ -189,26 +189,26 @@ __global__ void  Morph3x3_##name##_Kernel(       \
 \
    shmOutput[localIdx] = -1;\
 \
-   int prIdx, prCol, prRow, glCol, glRow, glIdx; \
+   int prIdx, prRow, prCol, glRow, glCol, glIdx; \
 \
    prIdx = localIdx;   \
-   prCol = COL_2D(prIdx, padRectStride);   \
    prRow = ROW_2D(prIdx, padRectStride);   \
-   glCol = cornerCol + prCol - 1;   \
+   prCol = COL_2D(prIdx, padRectStride);   \
    glRow = cornerRow + prRow - 1;   \
-   glIdx = IDX_1D(glCol, glRow, imgRows);   \
-   if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
+   glCol = cornerCol + prCol - 1;   \
+   glIdx = IDX_1D(glRow, glCol, imgCols);   \
+   if(glCol>=0 && glCol<imgCols && glRow>=0 && glRow<imgRows)   \
       shmPadRect[prIdx] = devInPtr[glIdx]*2 - 1;   \
    else   \
       shmPadRect[prIdx] = -1; \
 \
    prIdx = localPixels + localIdx;   \
-   prCol = COL_2D(prIdx, padRectStride);   \
    prRow = ROW_2D(prIdx, padRectStride);   \
-   glCol = cornerCol + prCol - 1;   \
+   prCol = COL_2D(prIdx, padRectStride);   \
    glRow = cornerRow + prRow - 1;   \
-   glIdx = IDX_1D(glCol, glRow, imgRows);   \
-   if(glRow>=0 && glRow<imgRows && glCol>=0 && glCol<imgCols)   \
+   glCol = cornerCol + prCol - 1;   \
+   glIdx = IDX_1D(glRow, glCol, imgCols);   \
+   if(glCol>=0 && glCol<imgCols && glRow>=0 && glRow<imgRows)   \
       shmPadRect[prIdx] = devInPtr[glIdx]*2 - 1;   \
    else   \
       shmPadRect[prIdx] = -1; \
@@ -216,60 +216,60 @@ __global__ void  Morph3x3_##name##_Kernel(       \
    __syncthreads();   \
 \
    int accum = 0;  \
-   int coff, roff, seVal, shmPRCol, shmPRRow, shmPRIdx; \
+   int coff, roff, seVal, shmPRRow, shmPRCol, shmPRIdx; \
 \
    coff=-1; roff=-1; seVal = a00; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=-1; roff=0; seVal = a01; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=-1; roff=1; seVal = a02; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=0; roff=-1; seVal = a10; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=0; roff=0; seVal = a11; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=0; roff=1; seVal = a12; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=1; roff=-1; seVal = a20; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=1; roff=0; seVal = a21; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    coff=1; roff=1; seVal = a22; \
-   shmPRCol = padRectCol + coff;     \
-   shmPRRow = padRectRow + roff;     \
-   shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);     \
+   shmPRRow = padRectRow + coff;     \
+   shmPRCol = padRectCol + roff;     \
+   shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);     \
    accum += seVal * shmPadRect[shmPRIdx];  \
 \
    if(accum >= seTargSum)  \
@@ -293,15 +293,15 @@ float  gpuStopTimer(void);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Read/Write images from/to files
-void ReadFile(string fn, int* targPtr, int nCols, int nRows);
+void ReadFile(string fn, int* targPtr, int nRows, int nCols);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Writing file in space-separated format
-void WriteFile(string fn, int* srcPtr, int nCols, int nRows);
+void WriteFile(string fn, int* srcPtr, int nRows, int nCols);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Writing image to stdout
-void PrintArray(int* srcPtr, int nCols, int nRows);
+void PrintArray(int* srcPtr, int nRows, int nCols);
 
 ////////////////////////////////////////////////////////////////////////////////
 // Copy a 3D texture from a host (float*) array to a device cudaArray
@@ -318,14 +318,14 @@ void createGaussian1D(float* targPtr,
                       float  ctr);
 
 // Assume target memory has already been allocated, nPixels is odd
-// Use col-row (D00_UL_ES)
+// Use Row-Col (D00_UL_ES)
 void createGaussian2D(float* targPtr, 
-                      int    nPixelsCol,
                       int    nPixelsRow,
-                      float  sigmaCol,
+                      int    nPixelsCol,
                       float  sigmaRow,
-                      float  ctrCol,
-                      float  ctrRow);
+                      float  sigmaCol,
+                      float  ctrRow,
+                      float  ctrCol);
 
 
 // Assume diameter^2 target memory has already been allocated
@@ -356,14 +356,15 @@ cudaImageHost createBinaryCircle( int diameter);
 //        operators will operate with {-1,0,1}
 //
 ////////////////////////////////////////////////////////////////////////////////
-__global__ void  Mask_Union_Kernel(     int* srcA, int* srcB, int* dst);
-__global__ void  Mask_Intersect_Kernel( int* srcA, int* srcB, int* dst);
-__global__ void  Mask_Subtract_Kernel(  int* srcA, int* srcB, int* dst);
+__global__ void  Mask_Union_Kernel(      int* srcA, int* srcB, int* dst);
+__global__ void  Mask_Intersect_Kernel(  int* srcA, int* srcB, int* dst);
+__global__ void  Mask_Subtract_Kernel(   int* srcA, int* srcB, int* dst);
 __global__ void  Mask_Difference_Kernel( int* srcA, int* srcB, int* dst);
-__global__ void  Mask_Invert_Kernel(    int* srcA,            int* dst);
-__global__ void  Mask_Copy_Kernel(      int* srcA,            int* dst);
+__global__ void  Mask_Invert_Kernel(     int* srcA,            int* dst);
+__global__ void  Mask_Copy_Kernel(       int* srcA,            int* dst);
 
 // Yes!  You need two EXTRA buffers to use Image_Sum;
+// It's optimized for simplicity, not necessarily speed or space
 __global__ void  Image_SumReduceStep_Kernel(int* bufIn, int* bufOut, int lastBlockSize);
 int Image_Sum(int* devPtr, int* devTemp1, int* devTemp2, int arraySize);
 

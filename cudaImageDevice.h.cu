@@ -17,12 +17,12 @@ class cudaImageDevice
 {
 private:
    int* imgData_;
-   int  imgCols_;
    int  imgRows_;
+   int  imgCols_;
    int  imgElts_;
    int  imgBytes_;
 
-   void Allocate(int ncols, int nrows);
+   void Allocate(int nRows, int nCols);
    void Deallocate(void);
 
    // Keep a master list of device memory allocations
@@ -31,24 +31,24 @@ private:
    static int totalDevMemUsed_;
 
 public:
-   void resize(int ncols, int nrows);
+   void resize(int nRows, int nCols);
    int id_;
 
    // Basic constructors
    cudaImageDevice();
-   cudaImageDevice(int ncols, int nrows);
+   cudaImageDevice(int nRows, int nCols);
    cudaImageDevice(cudaImageHost   const & hostImg);
    cudaImageDevice(cudaImageDevice const &  devImg);
    ~cudaImageDevice();
 
    // Copying memory Host<->Device
-   void copyFromHost  (int* hostPtr, int ncols, int nrows);
+   void copyFromHost  (int* hostPtr, int nRows, int nCols);
    void copyFromHost  (cudaImageHost const & hostImg);
    void copyToHost    (int* hostPtr) const;
    void copyToHost    (cudaImageHost & hostImg) const;
 
    // Copying memory Device<->Device
-   void copyFromDevice  (int* devicePtr, int ncols, int nrows);
+   void copyFromDevice  (int* devicePtr, int nRows, int nCols);
    void copyFromDevice  (cudaImageDevice const & deviceImg);
    void copyToDevice    (int* devicePtr) const;
    void copyToDevice    (cudaImageDevice & deviceImg) const;
@@ -63,8 +63,8 @@ public:
    static int calculateDeviceMemoryUsage(bool dispStdout=false);
 
    int* getDataPtr(void) const {return imgData_;}
-   int  numCols(void)    const {return imgCols_;}
    int  numRows(void)    const {return imgRows_;}
+   int  numCols(void)    const {return imgCols_;}
    int  numElts(void)    const {return imgElts_;}
    int  numBytes(void)   const {return imgBytes_;}
 

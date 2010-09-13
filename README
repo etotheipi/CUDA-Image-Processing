@@ -15,7 +15,7 @@ This a BETA version of a complete morph/convolve image processing library
 using CUDA.  CUDA is an NVIDIA programming interface for harnessing your
 NVIDIA graphics card to do computations.  For problems that are highly 
 parallelizable (like convolution or morphology) you can get speedups of 
-several orders of magnitude.  
+many orders of magnitude.  
 
 For instance, to convolve a 4096x4096 mask with a 15x15 point-spread fn,
 the CPU would take anywhere from 5 to 20 seconds.  Using this library 
@@ -29,18 +29,9 @@ work;  more on that below).
 
 
 This library is designed to be used for performing a sequence of image
-operations on a single image/mask.  This is standard for morphological
-processing, but also keeping the memory on the device saves a lot of 
-time.  The saying at my workplace is, "Copying data in and out of the
-device is expensive; Computation is basically free!"
-
-This isn't to say that the library can't be used for isolated morph
-operations (copy in, morph, copy out)... in fact, it shouldn't have
-any computational disadvantages compared to other libraries (besides
-kernel optimization design).  However, this library uses objects we
-call "Morphological Workbenches" which may be non-intuitive at first,
-but it actually simplifies the process of applying dozens, hundreds or
-thousands of operations to a single image/mask.  
+operations on a single image/mask, only copying the data in and out of 
+the device once.   Memory copies are expensive, computation is basically
+free...  
 
 I envision this library could be useful for GIMP plugins, or ATR
 systems.  Just remember, CUDA is NOT open-source, and the licensing
@@ -55,7 +46,7 @@ will not be favorable to OSS projects.
       THIS MAKEFILE ERASES *.cpp FILES WHEN CALLING "make clean"
 
    I don't know how to fix this.  Perhaps someone else knows.  Just be sure
-   not to check-in your cpp code before cleaning.
+   to check-in your cpp code before cleaning.
    
 
 -----
@@ -131,10 +122,204 @@ Planned Updates
      currently written with Compute Capability 2.0+ in mind, and who knows
      what happens when run on 1.X device.
 
-   - Add some reduction code for summing up large arrays (for instance,
-     subtracting two images and summing to find the difference)
-
    - Right now my focus has been on morphology, though regular convolution
      HAS been implemented.  I will implement a more-exhaustive array of 
      image processing functions, such as more filters and FFTs.
+
+   - I'm pretty sure that all operations need separate input/output buffers
+     I need to check that and then see if I can avoid it.
+
+
+-------------------------------------------------------------------------------
+----- 
+User Instructions - to use this library in your project
+
+   This library is designed for the user to put data on an "ImageWorkbench", 
+   which stores the data in device memory, perform thousands of operations, 
+   then copy the data back to the host.  Use cudaImageHost to store and move
+   data around in HOST memory, and initiate a ImageWorkbench object.
+
+   The user is welcome to create/use cudaImageDevice objects (to store and 
+   manage DEVICE memory), but it should be unnecessary, since the workbench 
+   handles that for you.  
+   
+
+   A typical usage paradigm might be like the following:
+
+      // Allocate and populate HOST memory
+      cudaImageHost imageIn, imageOut;
+      imageIn.readFromFile("picture.txt", 1024, 1024);
+
+      // Initialize the workbench -- this copies the img to DEVICE memory
+      ImageWorkbench theBench(imageIn);
+
+      theBench.Dilate();
+      theBench.Erode();
+      theBench.PruningSweep();
+      theBench.Open();
+      theBench.Dilate();
+      theBench.Dilate();
+      theBench.Median();
+      theBench.Dilate();
+   
+      // Use CountChanged method to determine how many pixels changed in 
+      // the previous operation.  Frequently, we may want to apply a sequence
+      // of operations until the image is no longer changing
+      int nChanged = -1;
+      while(nChanged != 0)
+      {
+         theBench.ThinningSweep();
+         nChanged = theBench.CountChanged();
+      }
+
+   If the user wishes to use supplied structuring elements, you create a 
+   cudaImageHost object using {-1, 0, +1} for {OFF, DONTCARE, ON}, and then
+   call:
+
+      int seIndex = ImageWorkbench::addStructElt(seImageHost);
+
+   This permanently stores the SE in a master (static list), and you only need
+   to supply the returned index to use it:
+
+      theBench.Dilate(seIndex); 
+      theBench.Open(seIndex); 
+      theBench.FindAndRemove(seIndex); 
+
+   
+   Every operation so far leaves the buffer management to the IWB object.
+   However, every method has optional two arguments for specifying source & 
+   destination buffers, if desired.   The valid buffers are also accessed 
+   by index:  'A', 'B', or N >= 1.  If a number is supplied, the IWB object
+   will use the Nth buffer in its extraBuffers_ vector.  If the buffer does
+   not exist, it will create it.  Keep in mind that A and B are #defines and
+   do not need quotes.  
+
+
+      // No arguments uses 3x3 optimized morphology, (A --> B)
+      theBench.Dilate();
+      
+      // Supply structuring element, still (A --> B)
+      theBench.Erode(seIndex);
+
+      // Default 3x3 median calc on buffer A, result goes to buf 1  (A --> 1)
+      theBench.Median(A, 1);   
+
+      // Copy in an external image to buffer 2  (Extern --> 2)
+      theBench.copyHostToBuffer(newImageSameSize, 2);   
+
+      // Union buffers 1 and 2, store the result in buffer B (1U2 --> B)
+      theBench.Union(1, 2, B);
+
+      // Subtract B from buffer 1, store in 2  (1-B -> 2)
+      theBench.Subtract(B, 1, 2);
+
+      // Now morphological-open the result with SE and copy back to A
+      theBench.Open(seIndex, B, A);
+      // DONE!
+      
+      // The last operation could've been replaced with the following two lines
+      theBench.Open(seIndex, B, B);
+      theBench.flipBuffers();   // switches buffer ptrs so B is now A and vv
+
+
+   In order to maintain IWB consistency, any manual buffer management needs
+   to end with the result in buffer A, or in buffer B followed by a call to
+   flipBuffers().  This is because subsequent operations always assume the 
+   last output was in buffer A.
+
+   
+
+   
+-------------------------------------------------------------------------------
+----- 
+Developer Stuff - to expand this library
+
+   The paradigm for developing this library differs substantially from simply 
+   using the library.  There are two main reasons for this:
+
+   1)  The developer needs his own set of buffers so that he has workspace but
+       doesn't overwrite the buffers that the user may have created himself
+   2)  The developer needs to ensure that every "standard" operations uses
+       buffer A as input, buffer B as output AND THAT BOTH BUFFERS DISTINCTLY
+       REPRESENT BEFORE-AND-AFTER VERSIONS of the operation.
+
+   Therefore, the developer CANNOT just implement morph-close operation as:
+      Dilate(seIndex);
+      Erode(seIndex);
+      
+   because a subsequent call to CountChanged would only give the number of
+   pixels that changed by the Erode operation.  This is more important than it
+   sounds, because many algorithms are based on observing when a cycle of
+   operations reaches steady state, and if the developer doesn't respect this 
+   behavior, the user would have to redundantly implement the sequence himself
+   to be able to do these kinds of checks.   This is especially true of thinning
+   and pruning, where you are performing 8 erosions and subtractions, and need
+   to stop when the entire sequence of operations no longer changes any pixels.
+
+   Therefore, the developer should ALWAYS use ZFunctions where possible.  These
+   functions always require source and destination, allow access to TEMP buffers
+   and do NOT flip the buffers when called.  In other words, the developer uses
+   a different set of tools, and does everything manually.
+   
+   Second thing to note is that the getBufPtrAny command has the following
+   domain:
+
+      {A=-1000, B=-1001, 1, 2, 3, 4, ..., -1, -2, -3, -4 ...}
+      |     PRIMARY    |      EXTRA     |    TEMPORARY      |
+
+   The user has access to PRIMARY and EXTRA.
+   The developer has access to all, but should only use PRIMARY and TEMP
+   
+   The difference between EXTRA and TEMPORARY is the the developer may create
+   a sequence of commands, which themselves may also use temporary buffers. 
+   This causes a recursion problem, where the developer has no way to protect
+   his own buffers from being overwritten by a method that he is calling.
+
+   Therefore, lock-flags were implemented so that the workbench can find the
+   next available TEMP buffer.  This retrieval "locks" the buffer, and it 
+   MUST be "released" at the end of the function.  Much like new&delete, there
+   needs to be a "release" for every "get".  This example demonstrates how
+   to write new methods safely for ImageWorkbench class:
+
+   void A_Complicated_Morph_Operation(int seIndex)
+   {
+      // Retrieve three temporary buffers from the workbench
+      int tmpBufIndex1 = getTempBuffer();
+      int tmpBufIndex2 = getTempBuffer();
+      int tmpBufIndex3 = getTempBuffer();
+
+      // Always read in from A
+      ZErode(A, tmpBufIndex1);
+      ZMedian(seIndex, tmpBufIndex1, tmpBufIndex2);
+      ZSubtract(tmpBufIndex2, A, tmpBufIndex3);
+      ZUnion(A, tmpBufIndex3, tmpBufIndex2);
+      ZDifference(tmpBufIndex2, tmpBufIndex1, tmpBufIndex3);
+
+      // Last morph op should always put result in B, and then flip
+      ZFindAndRemove( seIndex, tmpBufIndex3, B);
+      flipBuffers();
+
+      // Tell the workbench to "unlock" all the TEMP buffers we used
+      releaseTempBuffer(tmpBufIndex1);
+      releaseTempBuffer(tmpBufIndex2);
+      releaseTempBuffer(tmpBufIndex3);
+   }
+      
+      
+   As per the descriptions above, this means that all new GPU kernels should
+   take as input, pointers to input, output and all temporary memory locations
+   and the workbench will supply those pointers when wrapping the GPU kernels.
+   
+   This also means, that when implementing new methods in IWB, there should
+   actually be three new methods created:
+
+      NAME (arg1, arg2, ..., argN);  // calls above with src=A, dst=B, then flip
+      NAME (arg1, arg2, ..., argN, int srcBuf, int dstBuf);
+      ZNAME(arg1, arg2, ..., argN, int srcBuf, int dstBuf);
+
+
+
+
+
+
 

@@ -66,41 +66,41 @@
 __global__ void  Morph_Generic_Kernel( 
                int*  devInPtr,    
                int*  devOutPtr,    
-               int   imgCols,    
                int   imgRows,    
+               int   imgCols,    
                int*  sePtr,    
-               int   seColRad,
                int   seRowRad,
+               int   seColRad,
                int   seTargSum)
 {  
 
-   CREATE_CONVOLUTION_VARIABLES(seColRad, seRowRad); 
+   CREATE_CONVOLUTION_VARIABLES(seRowRad, seColRad); 
    shmOutput[localIdx] = -1;
 
-   const int seStride = seRowRad*2+1;   
-   const int sePixels = seStride*(seColRad*2+1);   
+   const int seStride = seColRad*2+1;   
+   const int sePixels = seStride*(seRowRad*2+1);   
    int* shmSE = (int*)&shmOutput[ROUNDUP32(localPixels)];   
 
    COPY_LIN_ARRAY_TO_SHMEM(sePtr, shmSE, sePixels); 
 
-   PREPARE_PADDED_RECTANGLE_MORPH(seColRad, seRowRad); 
+   PREPARE_PADDED_RECTANGLE_MORPH(seRowRad, seColRad); 
 
 
    __syncthreads();   
 
    int accumInt = 0;
-   for(int coff=-seColRad; coff<=seColRad; coff++)   
+   for(int roff=-seRowRad; roff<=seRowRad; roff++)   
    {   
-      for(int roff=-seRowRad; roff<=seRowRad; roff++)   
+      for(int coff=-seColRad; coff<=seColRad; coff++)   
       {   
-         int seCol = seColRad + coff;   
          int seRow = seRowRad + roff;   
-         int seIdx = IDX_1D(seCol, seRow, seStride);   
+         int seCol = seColRad + coff;   
+         int seIdx = IDX_1D(seRow, seCol, seStride);   
          int seVal = shmSE[seIdx];   
 
-         int shmPRCol = padRectCol + coff;   
          int shmPRRow = padRectRow + roff;   
-         int shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);   
+         int shmPRCol = padRectCol + coff;   
+         int shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);   
          accumInt += seVal * shmPadRect[shmPRIdx];
       }   
    }   

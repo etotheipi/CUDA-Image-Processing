@@ -3,14 +3,14 @@
 
 
 ////////////////////////////////////////////////////////////////////////////////
-void cudaImageHost::Allocate(int ncols, int nrows)
+void cudaImageHost::Allocate(int nRows, int nCols)
 {
-   imgCols_ = ncols;
-   imgRows_ = nrows;
-   imgElts_ = imgCols_*imgRows_;
+   imgRows_ = nRows;
+   imgCols_ = nCols;
+   imgElts_ = imgRows_*imgCols_;
    imgBytes_ = imgElts_*sizeof(int);
 
-   if(ncols == 0 || nrows == 0)
+   if(nRows == 0 || nCols == 0)
       imgData_ = NULL;
    else
    {
@@ -29,22 +29,22 @@ void cudaImageHost::Deallocate(void)
    if(imgData_ != NULL)
       free(imgData_);
    imgData_ = NULL;
-   imgCols_ = imgRows_ = imgElts_ = imgBytes_ = 0;
+   imgRows_ = imgCols_ = imgElts_ = imgBytes_ = 0;
 }
 
-void cudaImageHost::resize(int ncols, int nrows)
+void cudaImageHost::resize(int nRows, int nCols)
 {
    // If we already have the right amount of memory, don't do anything
-   if( imgElts_ == ncols*nrows)
+   if( imgElts_ == nRows*nCols)
    {
       // imgElts_ and imgBytes_ already correct, don't need to realloc
-      imgCols_ = ncols; 
-      imgRows_ = nrows;
+      imgRows_ = nRows; 
+      imgCols_ = nCols;
    }
    else
    {
       Deallocate();
-      Allocate(ncols, nrows);
+      Allocate(nRows, nCols);
    }
 }
 
@@ -56,45 +56,45 @@ cudaImageHost::~cudaImageHost()
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageHost::cudaImageHost() :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0) { }
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0) { }
 
 
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(int ncols, int nrows) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+cudaImageHost::cudaImageHost(int nRows, int nCols) :
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
-   Allocate(ncols, nrows);
+   Allocate(nRows, nCols);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(int* data, int ncols, int nrows) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+cudaImageHost::cudaImageHost(int* data, int nRows, int nCols) :
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
-   Allocate(ncols, nrows);    
+   Allocate(nRows, nCols);    
    MemcpyIn(data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-cudaImageHost::cudaImageHost(string filename, int ncols, int nrows) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+cudaImageHost::cudaImageHost(string filename, int nRows, int nCols) :
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
-   Allocate(ncols, nrows);
-   readFile(filename, ncols, nrows);
+   Allocate(nRows, nCols);
+   readFile(filename, nRows, nCols);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 cudaImageHost::cudaImageHost(cudaImageHost const & i2) :
-   imgData_(NULL), imgCols_(0), imgRows_(0), imgElts_(0), imgBytes_(0)
+   imgData_(NULL), imgRows_(0), imgCols_(0), imgElts_(0), imgBytes_(0)
 {
-   Allocate(i2.imgCols_, i2.imgRows_);
+   Allocate(i2.imgRows_, i2.imgCols_);
    MemcpyIn(i2.imgData_);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 void cudaImageHost::operator=(cudaImageHost const & i2)
 {
-   resize(i2.imgCols_, i2.imgRows_);
+   resize(i2.imgRows_, i2.imgCols_);
    MemcpyIn(i2.imgData_);
 }
 
@@ -102,10 +102,10 @@ void cudaImageHost::operator=(cudaImageHost const & i2)
 bool  cudaImageHost::operator==(cudaImageHost const & i2) const
 {
    bool isEq = true;
-   if(imgCols_ != i2.imgCols_ || imgRows_ != i2.imgRows_)
+   if(imgRows_ != i2.imgRows_ || imgCols_ != i2.imgCols_)
       isEq = false;
    else
-      for(int e=0; e<imgCols_; e++)
+      for(int e=0; e<imgElts_; e++)
          if(imgData_[e] != i2.imgData_[e])
             isEq = false;
 
@@ -113,16 +113,16 @@ bool  cudaImageHost::operator==(cudaImageHost const & i2) const
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Most of CUDA stuff will be done in col-major format, but files store data
-// in row-major format, which is why we switch the normal order of the loops
-void cudaImageHost::readFile(string filename, int ncols, int nrows)
+// Most of CUDA stuff will be done in Row-major format, but files store data
+// in Col-major format, which is why we switch the normal order of the loops
+void cudaImageHost::readFile(string filename, int nRows, int nCols)
 {
-   resize(ncols, nrows);
+   resize(nRows, nCols);
 
    ifstream is(filename.c_str(), ios::in);
    for(int r=0; r<imgRows_; r++)
       for(int c=0; c<imgCols_; c++)
-         is >> imgData_[c*imgRows_ + r];
+         is >> imgData_[r*imgCols_ + c];
    is.close();
 }
 
@@ -133,7 +133,7 @@ void cudaImageHost::writeFile(string filename) const
    for(int r=0; r<imgRows_; r++)
    {
       for(int c=0; c<imgCols_; c++)
-         os << imgData_[c*imgRows_+r] << " ";
+         os << imgData_[r*imgCols_+c] << " ";
       os << endl;
    }
    os.close();
@@ -147,7 +147,7 @@ void cudaImageHost::printMask(char zero, char one) const
    {
       for(int c=0; c<imgCols_; c++)
       {
-         int val = imgData_[c*imgRows_+r];
+         int val = imgData_[r*imgCols_+c];
          if(val == 0)
             cout << zero;
          else
@@ -165,7 +165,7 @@ void cudaImageHost::printImage(void) const
    {
       for(int c=0; c<imgCols_; c++)
       {
-         cout << imgData_[c*imgRows_+r] << endl;
+         cout << imgData_[r*imgCols_+c] << endl;
       }
       cout << endl;
    }
@@ -177,11 +177,11 @@ void cudaImageHost::printImage(void) const
 // order-of-magnitude timing
 void cudaImageHost::Dilate(cudaImageHost SE, cudaImageHost & target)
 {
-   int seW = SE.numCols();
    int seH = SE.numRows();
+   int seW = SE.numCols();
 
-   int imgW = imgCols_;
    int imgH = imgRows_;
+   int imgW = imgCols_;
 
    target.resize(imgW, imgH);
 

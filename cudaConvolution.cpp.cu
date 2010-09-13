@@ -9,41 +9,41 @@ using namespace std;
 __global__ void   convolveBasic( 
                int*   devInPtr,    
                int*   devOutPtr,    
-               int    imgCols,    
                int    imgRows,    
+               int    imgCols,    
                int*   devPsfPtr,    
-               int    psfColRad,
-               int    psfRowRad)
+               int    psfRowRad,
+               int    psfColRad)
 {  
 
-   CREATE_CONVOLUTION_VARIABLES(psfColRad, psfRowRad); 
+   CREATE_CONVOLUTION_VARIABLES(psfRowRad, psfColRad); 
    shmOutput[localIdx] = 0.0f;
 
-   const int psfStride = psfRowRad*2+1;   
-   const int psfPixels = psfStride*(psfColRad*2+1);   
+   const int psfStride = psfColRad*2+1;   
+   const int psfPixels = psfStride*(psfRowRad*2+1);   
    int* shmPsf = (int*)&shmOutput[ROUNDUP32(localPixels)];   
 
    COPY_LIN_ARRAY_TO_SHMEM(devPsfPtr, shmPsf, psfPixels); 
 
-   PREPARE_PADDED_RECTANGLE(psfColRad, psfRowRad); 
+   PREPARE_PADDED_RECTANGLE(psfRowRad, psfColRad); 
 
 
    __syncthreads();   
 
 
    int accum = 0.0f; 
-   for(int coff=-psfColRad; coff<=psfColRad; coff++)   
+   for(int roff=-psfRowRad; roff<=psfRowRad; roff++)   
    {   
-      for(int roff=-psfRowRad; roff<=psfRowRad; roff++)   
+      for(int coff=-psfColRad; coff<=psfColRad; coff++)   
       {   
-         int psfCol = psfColRad - coff;   
          int psfRow = psfRowRad - roff;   
-         int psfIdx = IDX_1D(psfCol, psfRow, psfStride);   
+         int psfCol = psfColRad - coff;   
+         int psfIdx = IDX_1D(psfRow, psfCol, psfStride);   
          int psfVal = shmPsf[psfIdx];   
 
-         int shmPRCol = padRectCol + coff;   
          int shmPRRow = padRectRow + roff;   
-         int shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);   
+         int shmPRCol = padRectCol + coff;   
+         int shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);   
          accum += psfVal * shmPadRect[shmPRIdx];   
       }   
    }   
@@ -57,28 +57,28 @@ __global__ void   convolveBasic(
 __global__ void   convolveBilateral( 
                int*   devInPtr,    
                int*   devOutPtr,    
-               int    imgCols,    
                int    imgRows,    
+               int    imgCols,    
                int*   devPsfPtr,    
-               int    psfColRad,
                int    psfRowRad,
+               int    psfColRad,
                int*   devIntPtr,    
                int    intensRad)
 {  
 
-   CREATE_CONVOLUTION_VARIABLES(psfColRad, psfRowRad); 
+   CREATE_CONVOLUTION_VARIABLES(psfRowRad, psfColRad); 
    shmOutput[localIdx] = 0.0f;
 
-   const int padRectIdx = IDX_1D(padRectCol, padRectRow, padRectStride);
-   const int psfStride = psfRowRad*2+1;   
-   const int psfPixels = psfStride*(psfColRad*2+1);   
+   const int padRectIdx = IDX_1D(padRectRow, padRectCol, padRectStride);
+   const int psfStride = psfColRad*2+1;   
+   const int psfPixels = psfStride*(psfRowRad*2+1);   
    int* shmPsf  = (int*)&shmOutput[ROUNDUP32(localPixels)];   
    int* shmPsfI = (int*)&shmPsf[ROUNDUP32(psfPixels)];   
 
    COPY_LIN_ARRAY_TO_SHMEM(devPsfPtr, shmPsf,  psfPixels); 
    COPY_LIN_ARRAY_TO_SHMEM(devIntPtr, shmPsfI, 2*intensRad+1);
 
-   PREPARE_PADDED_RECTANGLE(psfColRad, psfRowRad); 
+   PREPARE_PADDED_RECTANGLE(psfRowRad, psfColRad); 
 
 
    __syncthreads();   
@@ -86,18 +86,18 @@ __global__ void   convolveBilateral(
 
    int accum = 0.0f; 
    int myVal = shmPadRect[padRectIdx];
-   for(int coff=-psfColRad; coff<=psfColRad; coff++)   
+   for(int roff=-psfRowRad; roff<=psfRowRad; roff++)   
    {   
-      for(int roff=-psfRowRad; roff<=psfRowRad; roff++)   
+      for(int coff=-psfColRad; coff<=psfColRad; coff++)   
       {   
-         int psfCol = psfColRad - coff;   
          int psfRow = psfRowRad - roff;   
-         int psfIdx = IDX_1D(psfCol, psfRow, psfStride);   
+         int psfCol = psfColRad - coff;   
+         int psfIdx = IDX_1D(psfRow, psfCol, psfStride);   
          int psfVal = shmPsf[psfIdx];   
 
-         int shmPRCol = padRectCol + coff;   
          int shmPRRow = padRectRow + roff;   
-         int shmPRIdx = IDX_1D(shmPRCol, shmPRRow, padRectStride);   
+         int shmPRCol = padRectCol + coff;   
+         int shmPRIdx = IDX_1D(shmPRRow, shmPRCol, padRectStride);   
          int thatVal = shmPadRect[shmPRIdx];
 
          int intVal = shmPsfI[(int)(thatVal-myVal+intensRad)];

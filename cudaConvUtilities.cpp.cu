@@ -35,35 +35,35 @@ void createGaussian1D(float* targPtr,
 }
 
 // Assume target memory has already been allocate, nPixels is odd
-// Use col-row (D00_UL_ES)
+// Use Row-Col (D00_UL_ES)
 void createGaussian2D(float* targPtr, 
-                      int    nPixelsCol,
                       int    nPixelsRow,
-                      float  sigmaCol,
+                      int    nPixelsCol,
                       float  sigmaRow,
-                      float  ctrCol,
-                      float  ctrRow)
+                      float  sigmaCol,
+                      float  ctrRow,
+                      float  ctrCol)
 {
-   if(nPixelsCol%2 != 1 || nPixelsRow != 1)
+   if(nPixelsRow%2 != 1 || nPixelsCol != 1)
    {
       cout << "***Warning: createGaussian(...) only defined for odd pixel"  << endl;
       cout << "            dimensions.  Undefined behavior for even sizes." << endl;
    }
 
-   float pxCtrCol = (float)(nPixelsCol/2 + ctrCol);   
    float pxCtrRow = (float)(nPixelsRow/2 + ctrRow);   
-   float distCol, distRow, distColSqNorm, distRowSqNorm;
-   float denom = 2*M_PI*sigmaCol*sigmaRow;
-   for(int c=0; c<nPixelsCol; c++)
+   float pxCtrCol = (float)(nPixelsCol/2 + ctrCol);   
+   float distRow, distCol, distRowSqNorm, distColSqNorm;
+   float denom = 2*M_PI*sigmaRow*sigmaCol;
+   for(int r=0; r<nPixelsRow; r++)
    {
-      distCol = (float)c - pxCtrCol;
-      distColSqNorm = distCol*distCol / (sigmaCol*sigmaCol);
-      for(int r=0; r<nPixelsRow; r++)
+      distRow = (float)r - pxCtrRow;
+      distRowSqNorm = distRow*distRow / (sigmaRow*sigmaRow);
+      for(int c=0; c<nPixelsCol; c++)
       {
-         distRow = (float)r - pxCtrRow;
-         distRowSqNorm = distRow*distRow / (sigmaRow*sigmaRow);
+         distCol = (float)c - pxCtrCol;
+         distColSqNorm = distCol*distCol / (sigmaCol*sigmaCol);
          
-         targPtr[c*nPixelsRow+r] = exp(-0.5*(distColSqNorm + distRowSqNorm)) / denom;
+         targPtr[r*nPixelsCol+c] = exp(-0.5*(distRowSqNorm + distColSqNorm)) / denom;
       }
    }
 }
@@ -83,18 +83,18 @@ void createLaplacianOfGaussianKernel(float* targPtr,
    float dc, dr, dcSq, drSq;
    float sigma = diameter/10.0f;
    float sigmaSq = sigma*sigma;
-   for(int c=0; c<diameter; c++)
+   for(int r=0; r<diameter; r++)
    {
-      dc = (float)c - pxCtr;
-      dcSq = dc*dc;
-      for(int r=0; r<diameter; r++)
+      dr = (float)r - pxCtr;
+      drSq = dr*dr;
+      for(int c=0; c<diameter; c++)
       {
-         dr = (float)r - pxCtr;
-         drSq = dr*dr;
+         dc = (float)c - pxCtr;
+         dcSq = dc*dc;
    
-         float firstTerm  = (dcSq + drSq - 2*sigmaSq) / (sigmaSq * sigmaSq);
-         float secondTerm = exp(-0.5 * (dcSq + drSq) / sigmaSq);
-         targPtr[c*diameter+r] = firstTerm * secondTerm;
+         float firstTerm  = (drSq + dcSq - 2*sigmaSq) / (sigmaSq * sigmaSq);
+         float secondTerm = exp(-0.5 * (drSq + dcSq) / sigmaSq);
+         targPtr[r*diameter+c] = firstTerm * secondTerm;
       }
    }
 }
@@ -106,19 +106,19 @@ int createBinaryCircle(int* targPtr,
    float pxCtr = (float)(diameter-1) / 2.0f;
    float rad;
    int seNonZero = 0;
-   for(int c=0; c<diameter; c++)
+   for(int r=0; r<diameter; r++)
    {
-      for(int r=0; r<diameter; r++)
+      for(int c=0; c<diameter; c++)
       {
-         rad = sqrt((c-pxCtr)*(c-pxCtr) + (r-pxCtr)*(r-pxCtr));
+         rad = sqrt((r-pxCtr)*(r-pxCtr) + (c-pxCtr)*(c-pxCtr));
          if(rad <= pxCtr+0.5)
          {
-            targPtr[c*diameter+r] = 1;
+            targPtr[r*diameter+c] = 1;
             seNonZero++;
          }
          else
          {
-            targPtr[c*diameter+r] = 0;
+            targPtr[r*diameter+c] = 0;
          }
       }
    }
@@ -131,15 +131,15 @@ cudaImageHost createBinaryCircle(int diameter)
    cudaImageHost out(diameter, diameter);
    float pxCtr = (float)(diameter-1) / 2.0f;
    float rad;
-   for(int c=0; c<diameter; c++)
+   for(int r=0; r<diameter; r++)
    {
-      for(int r=0; r<diameter; r++)
+      for(int c=0; c<diameter; c++)
       {
-         rad = sqrt((c-pxCtr)*(c-pxCtr) + (r-pxCtr)*(r-pxCtr));
+         rad = sqrt((r-pxCtr)*(r-pxCtr) + (c-pxCtr)*(c-pxCtr));
          if(rad <= pxCtr+0.5)
-            out(c,r) = 1.0f;
+            out(r,c) = 1.0f;
          else
-            out(c,r) = 0.0f;
+            out(r,c) = 0.0f;
       }
    }
    return out;
@@ -189,27 +189,27 @@ float gpuStopTimer(void)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Read/Write images from/to files
-void ReadFile(string fn, int* targPtr, int nCols, int nRows)
+void ReadFile(string fn, int* targPtr, int nRows, int nCols)
 {
    ifstream in(fn.c_str(), ios::in);
-   // We work with col-row format, but files written in row-col, so switch loop
+   // We work with Row-Col format, but files written in Col-Row, so switch loop
    for(int r=0; r<nRows; r++)
       for(int c=0; c<nCols; c++)
-         in >> targPtr[c*nCols+r];
+         in >> targPtr[r*nRows+c];
    in.close();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Writing file in space-separated format
-void WriteFile(string fn, int* srcPtr, int nCols, int nRows)
+void WriteFile(string fn, int* srcPtr, int nRows, int nCols)
 {
    ofstream out(fn.c_str(), ios::out);
-   // We work with col-row format, but files written in row-col, so switch loop
+   // We work with Row-Col format, but files written in Col-Row, so switch loop
    for(int r=0; r<nRows; r++)
    {
       for(int c=0; c<nCols; c++)
       {
-         out << srcPtr[c*nRows+r] << " ";
+         out << srcPtr[r*nCols+c] << " ";
       }
       out << endl;
    }
@@ -218,15 +218,15 @@ void WriteFile(string fn, int* srcPtr, int nCols, int nRows)
 
 ////////////////////////////////////////////////////////////////////////////////
 // Writing image to stdout
-void PrintArray(int* srcPtr, int nCols, int nRows)
+void PrintArray(int* srcPtr, int nRows, int nCols)
 {
-   // We work with col-row format, but files written in row-col, so switch loop
+   // We work with Row-Col format, but files written in Col-Row, so switch loop
    for(int r=0; r<nRows; r++)
    {
       cout << "\t";
       for(int c=0; c<nCols; c++)
       {
-         cout << srcPtr[c*nRows+r] << " ";
+         cout << srcPtr[r*nCols+c] << " ";
       }
       cout << endl;
    }
@@ -425,7 +425,7 @@ int Image_Sum(int* devImgToSum, int* devTemp1, int* devTemp2, int arraySize)
 {
    // Yes, it seems silly to use two temp buffers to sum up an image, but
    // my goal was to make the reduction-kernel simple with the log(n) order of
-   // growth, but not necessarily space-efficient
+   // gColth, but not necessarily space-efficient
    
    cudaMemcpy(devTemp1, devImgToSum, arraySize*sizeof(int), cudaMemcpyDeviceToDevice);
    int* buf1 = devTemp1;

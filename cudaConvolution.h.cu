@@ -5,21 +5,21 @@
 __global__ void   convolveBasic( 
                int*   imgInPtr,    
                int*   imgOutPtr,    
-               int    imgCols,    
                int    imgRows,    
+               int    imgCols,    
                int*   imgPsfPtr,    
-               int    psfColRad,
-               int    psfRowRad);
+               int    psfRowRad,
+               int    psfColRad);
 
 
 __global__ void   convolveBilateral( 
                int*   devInPtr,    
                int*   devOutPtr,    
-               int    imgCols,    
                int    imgRows,    
+               int    imgCols,    
                int*   devPsfPtr,    
-               int    psfColRad,
                int    psfRowRad,
+               int    psfColRad,
                int*   devPsfPtr,    
                int    intensRad);
 

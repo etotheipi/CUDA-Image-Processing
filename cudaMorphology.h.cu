@@ -65,11 +65,11 @@
 __global__ void  Morph_Generic_Kernel( 
                int*  devInPtr,    
                int*  devOutPtr,    
-               int   imgCols,    
                int   imgRows,    
+               int   imgCols,    
                int*  sePtr,    
-               int   seColRad,
                int   seRowRad,
+               int   seColRad,
                int   seTargSum);
 
 ////////////////////////////////////////////////////////////////////////////////
