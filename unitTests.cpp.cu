@@ -336,7 +336,7 @@ void runWorkbenchUnitTests(void)
    cudaImageHost seRect(rectH, rectW);
    for(int r=0; r<rectH; r++)
       for(int c=0; c<rectW; c++)
-         seRect(c, r) = 1;
+         seRect(r, c) = 1;
 
 
    // The SEs are added to the static, master SE list in ImageWorkbench, and
@@ -578,8 +578,8 @@ void runTimingTests(void)
    circ[6].copyFromHost(createBinaryCircle(15));
    circ[7].copyFromHost(createBinaryCircle(17));
 
-   int testSizes[5] = {256, 512, 1024, 2048};
-   for(int test=0; test<4; test++)
+   int testSizes[5] = {256, 512, 1024, 2048, 2816};
+   for(int test=0; test<5; test++)
    {
       int size = testSizes[test];
       int sizesq = size*size;

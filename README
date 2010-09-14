@@ -214,11 +214,11 @@ User Instructions - to use this library in your project
       theBench.Subtract(B, 1, 2);
 
       // Now morphological-open the result with SE and copy back to A
-      theBench.Open(seIndex, B, A);
+      theBench.Open(seIndex, 2, A);
       // DONE!
       
       // The last operation could've been replaced with the following two lines
-      theBench.Open(seIndex, B, B);
+      theBench.Open(seIndex, 2, B);
       theBench.flipBuffers();   // switches buffer ptrs so B is now A and vv
 
 
@@ -267,8 +267,8 @@ Developer Stuff - to expand this library
       {A=-1000, B=-1001, 1, 2, 3, 4, ..., -1, -2, -3, -4 ...}
       |     PRIMARY    |      EXTRA     |    TEMPORARY      |
 
-   The user has access to PRIMARY and EXTRA.
-   The developer has access to all, but should only use PRIMARY and TEMP
+   The USER has access to PRIMARY & EXTRA (getBufferPtr won't accept neg vals)
+   The DEVELOPER has access to all, but should only use PRIMARY & TEMP
    
    The difference between EXTRA and TEMPORARY is the the developer may create
    a sequence of commands, which themselves may also use temporary buffers. 
@@ -313,9 +313,19 @@ Developer Stuff - to expand this library
    This also means, that when implementing new methods in IWB, there should
    actually be three new methods created:
 
-      NAME (arg1, arg2, ..., argN);  // calls above with src=A, dst=B, then flip
-      NAME (arg1, arg2, ..., argN, int srcBuf, int dstBuf);
-      ZNAME(arg1, arg2, ..., argN, int srcBuf, int dstBuf);
+      NAME (arg1, arg2, ...);    // calls below with src=A, dst=B, then flip
+      NAME (arg1, arg2, ..., int srcBuf, int dstBuf);  // no flip
+      ZNAME(arg1, arg2, ..., int srcBuf, int dstBuf);  // no flip, TEMP access
+
+
+   Some might argue that the ZNAME functions aren't necessary, since the only 
+   real difference they have compared to NAME is that they can access TEMP 
+   buffers.  There may be a better way to do this, and in fact, it may not be
+   necessary to shield the user from the TEMP buffers at all (just don't use them,
+   please).  Since most of the ZFunctions are written by #define macros anyway,
+   I'll leave them alone for now.
+
+
 
 
 

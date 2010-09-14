@@ -383,7 +383,7 @@ __global__ void  Image_SumReduceStep_Kernel( int* devBufIn,
 {  
    // ONLY USE THIS FUNCTION WITH BLOCK SIZE = (256,1,1);
    // We write it for that to 
-   __shared__ int sharedMem[4096];
+   __shared__ char sharedMem[4096];
    int* shmBuf1 = (int*)sharedMem;
    int* shmBuf2 = (int*)&sharedMem[512];
 

@@ -2,8 +2,8 @@
 *******************************************************************************
 ***Device query and selection:
 CUDA-enabled devices on this system:  2
-	* (0)      GeForce GTX 460 (767 MB): 	CUDA Capability 2.1 
-	  (1)          GeForce 210 (511 MB): 	CUDA Capability 1.2 
+	  (0)      GeForce GTX 460 (767 MB): 	CUDA Capability 2.1 
+	* (1)          GeForce 210 (511 MB): 	CUDA Capability 1.2 
 *******************************************************************************
 
 *******************************************************************************
@@ -176,87 +176,87 @@ Finished IWB testing!
 *******************************************************************************
 ***Executing timing tests...
 	Now allocate a 4096x4096 images and move them around:
-		Allocating 64MB in device memory took 0.09 ms (707464 MB/s)
-		Copying 64MB from HOST to DEVICE took 23.84 ms (2685 MB/s)
-		Copying 64MB from DEVICE to HOST took 62.20 ms (1029 MB/s)
-		Copying 64MB within DEVICE took 2.33 ms (27484 MB/s)
+		Allocating 64MB in device memory took 0.11 ms (577868 MB/s)
+		Copying 64MB from HOST to DEVICE took 25.54 ms (2506 MB/s)
+		Copying 64MB from DEVICE to HOST took 62.14 ms (1030 MB/s)
+		Copying 64MB within DEVICE took 22.12 ms (2894 MB/s)
 
 
-		Allocating 64MB in HOST memory took 0.01 ms (5333334 MB/s)
-		Copying 64MB within HOST took 58.71 ms (1090 MB/s)
+		Allocating 64MB in HOST memory took 0.01 ms (4571428 MB/s)
+		Copying 64MB within HOST took 59.28 ms (1080 MB/s)
 
 
 *******************************************************************************
 ***Timing a variety of morphological median calculations...
-	Morph  256x 256 image with optimized 3x3:     (real ms, gpu ms, FPS) = (0.06, 0.06, 16863.4 FPS)
-	Morph  256x 256 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (0.09, 0.09; 11086.5 FPS)
-	Morph  256x 256 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (0.12, 0.12; 8203.4 FPS)
-	Morph  256x 256 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (0.18, 0.18; 5531.0 FPS)
-	Morph  256x 256 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (0.24, 0.24; 4139.1 FPS)
-	Morph  256x 256 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (0.31, 0.31; 3209.2 FPS)
-	Morph  256x 256 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (0.40, 0.40; 2511.3 FPS)
-	Morph  256x 256 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (0.51, 0.51; 1974.3 FPS)
-	Morph  256x 256 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (0.76, 0.76; 1322.4 FPS)
-	Mask  UNION            two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 79365.1 FPS)
-	Mask  INTERSECT        two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 79365.1 FPS)
-	Mask  SUBTRACT         two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 68493.2 FPS)
-	Mask  INVERT           one  256x 256 image:   (real ms, gpu ms, FPS) = (0.01, 0.01; 100000.0 FPS)
-	Mask  DIFFERENCE       two  256x 256 images:  (real ms, gpu ms, FPS) = (0.01, 0.01; 79365.1 FPS)
-	Image REDUCTION SUM    one  256x 256 image:   (real ms, gpu ms, FPS) = (0.05, 0.05; 21276.6 FPS)
+	Morph  256x 256 image with optimized 3x3:     (real ms, gpu ms, FPS) = (1.20, 1.20, 831.0 FPS)
+	Morph  256x 256 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (2.05, 2.05; 487.7 FPS)
+	Morph  256x 256 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (2.90, 2.90; 345.0 FPS)
+	Morph  256x 256 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (4.14, 4.14; 241.4 FPS)
+	Morph  256x 256 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (6.31, 6.31; 158.5 FPS)
+	Morph  256x 256 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (6.94, 6.94; 144.1 FPS)
+	Morph  256x 256 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (9.63, 9.63; 103.8 FPS)
+	Morph  256x 256 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (11.01, 11.01; 90.8 FPS)
+	Morph  256x 256 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (20.96, 20.96; 47.7 FPS)
+	Mask  UNION            two  256x 256 images:  (real ms, gpu ms, FPS) = (0.14, 0.14; 7396.5 FPS)
+	Mask  INTERSECT        two  256x 256 images:  (real ms, gpu ms, FPS) = (0.13, 0.13; 7434.9 FPS)
+	Mask  SUBTRACT         two  256x 256 images:  (real ms, gpu ms, FPS) = (0.16, 0.16; 6361.3 FPS)
+	Mask  INVERT           one  256x 256 image:   (real ms, gpu ms, FPS) = (0.09, 0.09; 10905.1 FPS)
+	Mask  DIFFERENCE       two  256x 256 images:  (real ms, gpu ms, FPS) = (0.13, 0.13; 7434.9 FPS)
+	Image REDUCTION SUM    one  256x 256 image:   (real ms, gpu ms, FPS) = (0.24, 0.24; 4111.8 FPS)
 		sum=32768 (should be 32768)
 
 
-	Morph  512x 512 image with optimized 3x3:     (real ms, gpu ms, FPS) = (0.22, 0.22, 4591.4 FPS)
-	Morph  512x 512 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (0.34, 0.35; 2898.6 FPS)
-	Morph  512x 512 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (0.47, 0.47; 2120.0 FPS)
-	Morph  512x 512 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (0.71, 0.71; 1413.8 FPS)
-	Morph  512x 512 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (0.95, 0.95; 1052.6 FPS)
-	Morph  512x 512 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (1.23, 1.23; 814.7 FPS)
-	Morph  512x 512 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (1.58, 1.58; 633.0 FPS)
-	Morph  512x 512 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (2.00, 2.00; 500.5 FPS)
-	Morph  512x 512 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (2.94, 2.94; 339.6 FPS)
-	Mask  UNION            two  512x 512 images:  (real ms, gpu ms, FPS) = (0.04, 0.04; 23364.5 FPS)
-	Mask  INTERSECT        two  512x 512 images:  (real ms, gpu ms, FPS) = (0.04, 0.04; 23310.0 FPS)
-	Mask  SUBTRACT         two  512x 512 images:  (real ms, gpu ms, FPS) = (0.05, 0.05; 20284.0 FPS)
-	Mask  INVERT           one  512x 512 image:   (real ms, gpu ms, FPS) = (0.03, 0.03; 31847.1 FPS)
-	Mask  DIFFERENCE       two  512x 512 images:  (real ms, gpu ms, FPS) = (0.04, 0.04; 23255.8 FPS)
-	Image REDUCTION SUM    one  512x 512 image:   (real ms, gpu ms, FPS) = (0.10, 0.10; 9950.2 FPS)
+	Morph  512x 512 image with optimized 3x3:     (real ms, gpu ms, FPS) = (4.85, 4.85, 206.3 FPS)
+	Morph  512x 512 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (8.20, 8.20; 121.9 FPS)
+	Morph  512x 512 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (11.61, 11.61; 86.1 FPS)
+	Morph  512x 512 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (16.65, 16.64; 60.1 FPS)
+	Morph  512x 512 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (25.33, 25.32; 39.5 FPS)
+	Morph  512x 512 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (27.83, 27.83; 35.9 FPS)
+	Morph  512x 512 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (38.51, 38.50; 26.0 FPS)
+	Morph  512x 512 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (44.06, 44.05; 22.7 FPS)
+	Morph  512x 512 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (83.91, 83.89; 11.9 FPS)
+	Mask  UNION            two  512x 512 images:  (real ms, gpu ms, FPS) = (0.52, 0.52; 1914.6 FPS)
+	Mask  INTERSECT        two  512x 512 images:  (real ms, gpu ms, FPS) = (0.52, 0.52; 1916.1 FPS)
+	Mask  SUBTRACT         two  512x 512 images:  (real ms, gpu ms, FPS) = (0.61, 0.61; 1632.9 FPS)
+	Mask  INVERT           one  512x 512 image:   (real ms, gpu ms, FPS) = (0.35, 0.35; 2843.3 FPS)
+	Mask  DIFFERENCE       two  512x 512 images:  (real ms, gpu ms, FPS) = (0.52, 0.52; 1916.4 FPS)
+	Image REDUCTION SUM    one  512x 512 image:   (real ms, gpu ms, FPS) = (0.79, 0.79; 1261.5 FPS)
 		sum=131072 (should be 131072)
 
 
-	Morph 1024x1024 image with optimized 3x3:     (real ms, gpu ms, FPS) = (0.86, 0.86, 1168.6 FPS)
-	Morph 1024x1024 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (1.36, 1.36; 734.3 FPS)
-	Morph 1024x1024 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (1.87, 1.87; 534.4 FPS)
-	Morph 1024x1024 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (2.80, 2.80; 357.3 FPS)
-	Morph 1024x1024 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (3.77, 3.77; 265.1 FPS)
-	Morph 1024x1024 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (4.87, 4.87; 205.1 FPS)
-	Morph 1024x1024 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (6.31, 6.31; 158.5 FPS)
-	Morph 1024x1024 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (7.95, 7.95; 125.8 FPS)
-	Morph 1024x1024 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (11.69, 11.69; 85.6 FPS)
-	Mask  UNION            two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.17, 0.17; 6042.3 FPS)
-	Mask  INTERSECT        two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.16, 0.17; 6060.6 FPS)
-	Mask  SUBTRACT         two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.19, 0.19; 5376.3 FPS)
-	Mask  INVERT           one 1024x1024 image:   (real ms, gpu ms, FPS) = (0.12, 0.12; 8424.6 FPS)
-	Mask  DIFFERENCE       two 1024x1024 images:  (real ms, gpu ms, FPS) = (0.17, 0.17; 6045.9 FPS)
-	Image REDUCTION SUM    one 1024x1024 image:   (real ms, gpu ms, FPS) = (0.32, 0.32; 3104.6 FPS)
+	Morph 1024x1024 image with optimized 3x3:     (real ms, gpu ms, FPS) = (19.97, 19.96, 50.1 FPS)
+	Morph 1024x1024 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (33.02, 33.01; 30.3 FPS)
+	Morph 1024x1024 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (46.31, 46.29; 21.6 FPS)
+	Morph 1024x1024 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (67.35, 67.33; 14.8 FPS)
+	Morph 1024x1024 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (101.36, 101.33; 9.9 FPS)
+	Morph 1024x1024 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (111.62, 111.59; 9.0 FPS)
+	Morph 1024x1024 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (154.15, 154.11; 6.5 FPS)
+	Morph 1024x1024 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (176.73, 176.69; 5.7 FPS)
+	Morph 1024x1024 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (335.75, 335.66; 3.0 FPS)
+	Mask  UNION            two 1024x1024 images:  (real ms, gpu ms, FPS) = (2.07, 2.07; 482.9 FPS)
+	Mask  INTERSECT        two 1024x1024 images:  (real ms, gpu ms, FPS) = (2.07, 2.07; 483.0 FPS)
+	Mask  SUBTRACT         two 1024x1024 images:  (real ms, gpu ms, FPS) = (2.43, 2.43; 411.2 FPS)
+	Mask  INVERT           one 1024x1024 image:   (real ms, gpu ms, FPS) = (1.39, 1.39; 719.3 FPS)
+	Mask  DIFFERENCE       two 1024x1024 images:  (real ms, gpu ms, FPS) = (2.07, 2.07; 482.9 FPS)
+	Image REDUCTION SUM    one 1024x1024 image:   (real ms, gpu ms, FPS) = (3.01, 3.01; 332.1 FPS)
 		sum=524288 (should be 524288)
 
 
-	Morph 2048x2048 image with optimized 3x3:     (real ms, gpu ms, FPS) = (3.37, 3.37, 296.7 FPS)
-	Morph 2048x2048 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (5.43, 5.43; 184.1 FPS)
-	Morph 2048x2048 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (7.45, 7.45; 134.1 FPS)
-	Morph 2048x2048 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (11.15, 11.15; 89.7 FPS)
-	Morph 2048x2048 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (15.00, 15.00; 66.7 FPS)
-	Morph 2048x2048 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (19.42, 19.42; 51.5 FPS)
-	Morph 2048x2048 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (25.07, 25.07; 39.9 FPS)
-	Morph 2048x2048 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (31.71, 31.70; 31.5 FPS)
-	Morph 2048x2048 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (46.62, 46.61; 21.4 FPS)
-	Mask  UNION            two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.66, 0.66; 1514.2 FPS)
-	Mask  INTERSECT        two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.65, 0.65; 1528.6 FPS)
-	Mask  SUBTRACT         two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.73, 0.73; 1363.7 FPS)
-	Mask  INVERT           one 2048x2048 image:   (real ms, gpu ms, FPS) = (0.47, 0.47; 2145.0 FPS)
-	Mask  DIFFERENCE       two 2048x2048 images:  (real ms, gpu ms, FPS) = (0.65, 0.65; 1528.1 FPS)
-	Image REDUCTION SUM    one 2048x2048 image:   (real ms, gpu ms, FPS) = (1.17, 1.17; 855.7 FPS)
+	Morph 2048x2048 image with optimized 3x3:     (real ms, gpu ms, FPS) = (83.61, 83.59, 12.0 FPS)
+	Morph 2048x2048 image with  3x 3 struct elt:  (real ms, gpu ms, FPS) = (132.86, 132.83; 7.5 FPS)
+	Morph 2048x2048 image with  5x 5 struct elt:  (real ms, gpu ms, FPS) = (185.80, 185.75; 5.4 FPS)
+	Morph 2048x2048 image with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (270.61, 270.53; 3.7 FPS)
+	Morph 2048x2048 image with  9x 9 struct elt:  (real ms, gpu ms, FPS) = (406.63, 406.52; 2.5 FPS)
+	Morph 2048x2048 image with 11x11 struct elt:  (real ms, gpu ms, FPS) = (447.40, 447.28; 2.2 FPS)
+	Morph 2048x2048 image with 13x13 struct elt:  (real ms, gpu ms, FPS) = (616.92, 616.76; 1.6 FPS)
+	Morph 2048x2048 image with 15x15 struct elt:  (real ms, gpu ms, FPS) = (708.02, 707.83; 1.4 FPS)
+	Morph 2048x2048 image with 17x17 struct elt:  (real ms, gpu ms, FPS) = (1342.90, 1342.55; 0.7 FPS)
+	Mask  UNION            two 2048x2048 images:  (real ms, gpu ms, FPS) = (8.27, 8.26; 121.0 FPS)
+	Mask  INTERSECT        two 2048x2048 images:  (real ms, gpu ms, FPS) = (8.27, 8.26; 121.0 FPS)
+	Mask  SUBTRACT         two 2048x2048 images:  (real ms, gpu ms, FPS) = (9.71, 9.71; 103.0 FPS)
+	Mask  INVERT           one 2048x2048 image:   (real ms, gpu ms, FPS) = (5.54, 5.54; 180.4 FPS)
+	Mask  DIFFERENCE       two 2048x2048 images:  (real ms, gpu ms, FPS) = (8.27, 8.26; 121.0 FPS)
+	Image REDUCTION SUM    one 2048x2048 image:   (real ms, gpu ms, FPS) = (11.81, 11.81; 84.7 FPS)
 		sum=2097152 (should be 2097152)
 
 
@@ -267,29 +267,29 @@ Finished IWB testing!
 *******************************************************************************
 ***Timing tests on different block sizes, 1024x1024 image with 7x7 SE
 
-	Block size = (16,16), Grid size = ( 64, 64), CPU Timing:  2.58 ms -- 387.6 FPS
-	Block size = (32, 8), Grid size = ( 32,128), CPU Timing:  2.95 ms -- 338.5 FPS
-	Block size = ( 8,32), Grid size = (128, 32), CPU Timing:  2.80 ms -- 357.3 FPS
-	Block size = (16,32), Grid size = ( 64, 32), CPU Timing:  2.74 ms -- 365.6 FPS
-	Block size = (32,16), Grid size = ( 32, 64), CPU Timing:  2.92 ms -- 342.0 FPS
-	Block size = (16, 8), Grid size = ( 64,128), CPU Timing:  2.91 ms -- 343.2 FPS
-	Block size = ( 8,16), Grid size = (128, 64), CPU Timing:  2.93 ms -- 341.9 FPS
-	Block size = ( 8, 8), Grid size = (128,128), CPU Timing:  4.87 ms -- 205.4 FPS
+	Block size = (16,16), Grid size = ( 64, 64), CPU Timing:  70.20 ms -- 14.2 FPS
+	Block size = (32, 8), Grid size = ( 32,128), CPU Timing:  75.81 ms -- 13.2 FPS
+	Block size = ( 8,32), Grid size = (128, 32), CPU Timing:  67.28 ms -- 14.9 FPS
+	Block size = (16,32), Grid size = ( 64, 32), CPU Timing:  63.70 ms -- 15.7 FPS
+	Block size = (32,16), Grid size = ( 32, 64), CPU Timing:  64.94 ms -- 15.4 FPS
+	Block size = (16, 8), Grid size = ( 64,128), CPU Timing:  99.38 ms -- 10.1 FPS
+	Block size = ( 8,16), Grid size = (128, 64), CPU Timing:  94.33 ms -- 10.6 FPS
+	Block size = ( 8, 8), Grid size = (128,128), CPU Timing:  176.35 ms -- 5.7 FPS
 
 
 *******************************************************************************
 
 ***Test a few of the same operations with the workbench
-	Workbench  512x 512 with optimized 3x3:     (real ms, gpu ms, FPS) = (0.22, 0.22; 4599.8 FPS)
-	Workbench  512x 512 with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (0.71, 0.71; 1415.0 FPS)
-	Workbench  512x 512 with 15x15 struct elt:  (real ms, gpu ms, FPS) = (2.00, 2.00; 500.6 FPS)
-	Reduction SUM on a  512x 512 image:  (real ms, gpu ms, FPS) = (0.13, 0.13; 7824.7 FPS)
+	Workbench  512x 512 with optimized 3x3:     (real ms, gpu ms, FPS) = (4.84, 4.84; 206.4 FPS)
+	Workbench  512x 512 with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (16.66, 16.65; 60.0 FPS)
+	Workbench  512x 512 with 15x15 struct elt:  (real ms, gpu ms, FPS) = (44.20, 44.19; 22.6 FPS)
+	Reduction SUM on a  512x 512 image:  (real ms, gpu ms, FPS) = (0.85, 0.85; 1177.7 FPS)
 	sum=131072   (should be 131072)
 
-	Workbench 2048x2048 with optimized 3x3:     (real ms, gpu ms, FPS) = (3.37, 3.37; 296.8 FPS)
-	Workbench 2048x2048 with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (11.13, 11.13; 89.8 FPS)
-	Workbench 2048x2048 with 15x15 struct elt:  (real ms, gpu ms, FPS) = (31.70, 31.69; 31.5 FPS)
-	Reduction SUM on a 2048x2048 image:  (real ms, gpu ms, FPS) = (1.27, 1.27; 787.6 FPS)
+	Workbench 2048x2048 with optimized 3x3:     (real ms, gpu ms, FPS) = (83.80, 83.78; 11.9 FPS)
+	Workbench 2048x2048 with  7x 7 struct elt:  (real ms, gpu ms, FPS) = (270.55, 270.48; 3.7 FPS)
+	Workbench 2048x2048 with 15x15 struct elt:  (real ms, gpu ms, FPS) = (713.34, 713.15; 1.4 FPS)
+	Reduction SUM on a 2048x2048 image:  (real ms, gpu ms, FPS) = (12.30, 12.29; 81.3 FPS)
 	sum=2097152   (should be 2097152)
 
 

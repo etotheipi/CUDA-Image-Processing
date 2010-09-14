@@ -165,7 +165,7 @@ COMMONFLAGS += $(INCLUDES) -DUNIX
 # Debug/release configuration
 ifeq ($(dbg),1)
 	COMMONFLAGS += -g 
-	NVCCFLAGS   += -D_DEBUG -G0 --maxrregcount 20
+	NVCCFLAGS   += -D_DEBUG -G0 
 	CXXFLAGS    += -D_DEBUG
 	CFLAGS      += -D_DEBUG
 	BINSUBDIR   := debug
