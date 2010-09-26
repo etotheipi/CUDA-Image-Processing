@@ -1,16 +1,12 @@
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
- * NVIDIA Corporation and its licensors retain all intellectual property and 
- * proprietary rights in and to this software and related documentation. 
- * Any use, reproduction, disclosure, or distribution of this software 
- * and related documentation without an express license agreement from
- * NVIDIA Corporation is strictly prohibited.
+ * Please refer to the NVIDIA end user license agreement (EULA) associated
+ * with this source code for terms and conditions that govern your use of
+ * this software. Any use, reproduction, disclosure, or distribution of
+ * this software and related documentation outside the terms of the EULA
+ * is strictly prohibited.
  *
- * Please refer to the applicable NVIDIA end user license agreement (EULA) 
- * associated with this source code for terms and conditions that govern 
- * your use of this NVIDIA software.
- * 
  */
  
  //
@@ -96,6 +92,9 @@ inline GLuint CompileGLSLShaderFromFile( GLenum target, const char* filename)
     text = new char[size+1];
     fsize = fread( text, size, 1, shaderFile);
     fclose( shaderFile);
+    if (fsize == 0) 
+       printf("CompileGLSLShaderFromFile(), error... fsize = 0\n");
+
     text[size] = '\0';
 
     GLuint object = CompileGLSLShader( target, text);
@@ -227,6 +226,9 @@ inline GLuint CompileASMShaderFromFile( GLenum target, const char* filename)
     text = new char[size+1];
     fsize = fread( text, size, 1, shaderFile);
     fclose( shaderFile);
+    if (fsize == 0) 
+       printf("CompileGLSLShaderFromFile(), error... fsize = 0\n");
+
     text[size] = '\0';
 
     GLuint program_id = CompileASMShader( target, text);

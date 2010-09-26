@@ -1,12 +1,12 @@
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
- * NVIDIA Corporation and its licensors retain all intellectual property and 
- * proprietary rights in and to this software and related documentation. 
- * Any use, reproduction, disclosure, or distribution of this software 
- * and related documentation without an express license agreement from
- * NVIDIA Corporation is strictly prohibited.
- * 
+ * Please refer to the NVIDIA end user license agreement (EULA) associated
+ * with this source code for terms and conditions that govern your use of
+ * this software. Any use, reproduction, disclosure, or distribution of
+ * this software and related documentation outside the terms of the EULA
+ * is strictly prohibited.
+ *
  */
  
  #ifndef _CUTIL_GL_INLINE_H_
@@ -24,11 +24,11 @@
 
 
 #if __DEVICE_EMULATION__
-    inline void cutilGLDeviceInit(int ARGC, char **ARGV) { }
-    inline void cutilGLDeviceInitDrv(int cuDevice, int ARGC, char **ARGV) { } 
+    inline int cutilGLDeviceInit(int ARGC, char **ARGV) { return 0; }
+    inline int cutilGLDeviceInitDrv(int cuDevice, int ARGC, char **ARGV) { return 0; } 
     inline void cutilChooseCudaGLDevice(int ARGC, char **ARGV) { }
 #else
-    inline void cutilGLDeviceInit(int ARGC, char **ARGV)
+    inline int cutilGLDeviceInit(int ARGC, char **ARGV)
     {
         int deviceCount;
         cutilSafeCallNoSync(cudaGetDeviceCount(&deviceCount));
@@ -38,8 +38,12 @@
         }
         int dev = 0;
         cutGetCmdLineArgumenti(ARGC, (const char **) ARGV, "device", &dev);
-	    if (dev < 0) dev = 0;\
-        if (dev > deviceCount-1) dev = deviceCount - 1;
+        if (dev < 0)
+            dev = 0;
+        if (dev > deviceCount-1) {
+            fprintf(stderr, "cutilDeviceInit (Device=%d) invalid GPU device.  %d GPU device(s) detected.\n\n", dev, deviceCount);
+            return -dev;
+        }
         cudaDeviceProp deviceProp;
         cutilSafeCallNoSync(cudaGetDeviceProperties(&deviceProp, dev));
         if (deviceProp.major < 1) {
@@ -49,9 +53,10 @@
         if (cutCheckCmdLineFlag(ARGC, (const char **) ARGV, "quiet") == CUTFalse)
             fprintf(stderr, "Using device %d: %s\n", dev, deviceProp.name);
         cutilSafeCall(cudaGLSetGLDevice(dev));
+        return dev;
     }
 
-    inline void cutilGLDeviceInitDrv(int cuDevice, int ARGC, char ** ARGV) 
+    inline int cutilGLDeviceInitDrv(int cuDevice, int ARGC, char ** ARGV) 
     {
         cuDevice = 0;
         int deviceCount = 0;
@@ -62,27 +67,42 @@
             fprintf(stderr, "CUTIL DeviceInitDrv error: no devices supporting CUDA\n");
             exit(-1);
         }
+
         int dev = 0;
         cutGetCmdLineArgumenti(ARGC, (const char **) ARGV, "device", &dev);
-	    if (dev < 0) dev = 0;
-        if (dev > deviceCount-1) dev = deviceCount - 1;
+        if (dev < 0)
+            dev = 0;
+        if (dev > deviceCount-1) {
+            fprintf(stderr, "cutilDeviceInit (Device=%d) invalid GPU device.  %d GPU device(s) detected.\n\n", dev, deviceCount);
+            return -dev;
+        }
         cutilDrvSafeCallNoSync(cuDeviceGet(&cuDevice, dev));
         char name[100];
         cuDeviceGetName(name, 100, cuDevice);
-        if (cutCheckCmdLineFlag(ARGC, (const char **) ARGV, "quiet") == CUTFalse)
+        if (cutCheckCmdLineFlag(ARGC, (const char **) ARGV, "quiet") == CUTFalse) {
             fprintf(stderr, "Using device %d: %s\n", dev, name);
+        }
+        return dev;
     }
 
     // This function will pick the best CUDA device available with OpenGL interop
-    inline void cutilChooseCudaGLDevice(int argc, char **argv)
+    inline int cutilChooseCudaGLDevice(int argc, char **argv)
     {
+		int devID = 0;
         // If the command-line has a device number specified, use it
         if( cutCheckCmdLineFlag(argc, (const char**)argv, "device") ) {
-            cutilGLDeviceInit(argc, argv);
+			devID = cutilGLDeviceInit(argc, argv);
+			if (devID < 0) {
+			   printf("exiting...\n");
+			   cutilExit(argc, argv);
+			   exit(0);
+			}
         } else {
             // Otherwise pick the device with highest Gflops/s
-            cudaGLSetGLDevice( cutGetMaxGflopsDeviceId() );
+			devID = cutGetMaxGflopsDeviceId();
+            cudaGLSetGLDevice( devID );
         }
+		return devID;
     }
 
 #endif

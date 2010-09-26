@@ -30,8 +30,11 @@ ifdef cuda-install
 endif
 
 # detect OS
-OSUPPER = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
-OSLOWER = $(shell uname -s 2>/dev/null | tr [:upper:] [:lower:])
+OSUPPER   = $(shell uname -s 2>/dev/null | tr [:lower:] [:upper:])
+OSLOWER   = $(shell uname -s 2>/dev/null | tr [:upper:] [:lower:])
+ifndef OS
+  OSNAME := $(shell uname)
+endif
 
 # 'linux' is output for Linux system, 'darwin' for OS X
 DARWIN = $(strip $(findstring DARWIN, $(OSUPPER)))
@@ -52,7 +55,7 @@ BINDIR     ?= $(ROOTBINDIR)/$(OSLOWER)
 ROOTOBJDIR ?= obj
 LIBDIR     := $(ROOTDIR)/lib
 COMMONDIR  := $(ROOTDIR)/common
-SHAREDDIR  := $(ROOTDIR)/common/shared/
+SHAREDDIR  := $(ROOTDIR)/common/shared
 
 # Compilers
 NVCC       := $(CUDA_INSTALL_PATH)/bin/nvcc 
@@ -60,8 +63,17 @@ CXX        := g++
 CC         := gcc
 LINK       := g++ -fPIC
 
+# allow environment paths to override the default settings
+ifndef CUDA_INC_PATH
+  CUDA_INC_PATH := $(CUDA_INSTALL_PATH)/include
+endif
+
+ifndef CUDA_LIB_PATH
+  CUDA_LIB_PATH := $(CUDA_INSTALL_PATH)/lib
+endif
+
 # Includes
-INCLUDES  += -I. -I$(CUDA_INSTALL_PATH)/include -I$(COMMONDIR)/inc -I$(SHAREDDIR)/inc
+INCLUDES  += -I. -I$(CUDA_INC_PATH) -I$(COMMONDIR)/inc -I$(SHAREDDIR)/inc
 
 # Warning flags
 CXXWARN_FLAGS := \
@@ -89,7 +101,7 @@ CWARN_FLAGS := $(CXXWARN_FLAGS) \
 # architecture flag for nvcc and gcc compilers build
 CUBIN_ARCH_FLAG :=
 CXX_ARCH_FLAGS  :=
-NVCCFLAGS       := 
+NVCCFLAGS       :=
 LIB_ARCH        := $(OSARCH)
 
 # Determining the necessary Cross-Compilation Flags
@@ -156,7 +168,7 @@ LINK      += $(LINKFLAGS) $(CXX_ARCH_FLAGS)
 
 # This option for Mac allows CUDA applications to work without requiring to set DYLD_LIBRARY_PATH
 ifneq ($(DARWIN),)
-   LINK += -Xlinker -rpath $(CUDA_INSTALL_PATH)/lib
+   LINK += -Xlinker -rpath $(CUDA_LIB_PATH)
 endif
 
 # Common flags
@@ -164,8 +176,8 @@ COMMONFLAGS += $(INCLUDES) -DUNIX
 
 # Debug/release configuration
 ifeq ($(dbg),1)
-	COMMONFLAGS += -g 
-	NVCCFLAGS   += -D_DEBUG -G0 
+	COMMONFLAGS += -g
+	NVCCFLAGS   += -D_DEBUG
 	CXXFLAGS    += -D_DEBUG
 	CFLAGS      += -D_DEBUG
 	BINSUBDIR   := debug
@@ -174,7 +186,7 @@ else
 	COMMONFLAGS += -O2 
 	BINSUBDIR   := release
 	LIBSUFFIX   := 
-	NVCCFLAGS   += --compiler-options -fno-strict-aliasing 
+	NVCCFLAGS   += --compiler-options -fno-strict-aliasing
 	CXXFLAGS    += -fno-strict-aliasing
 	CFLAGS      += -fno-strict-aliasing
 endif
@@ -245,34 +257,30 @@ ifeq ($(USERENDERCHECKGL),1)
 endif
 
 ifeq ($(USECUDPP), 1)
-    CUDPPLIB := -lcudpp_$(CUDPPLIB_SUFFIX)$(LIBSUFFIX)
-
-    ifeq ($(emu), 1)
-        CUDPPLIB := $(CUDPPLIB)_emu
-    endif
+    CUDPPLIB := -lcudpp_$(CUDPPLIB_SUFFIX)
 endif
 
 ifeq ($(USENVCUVID), 1)
      ifneq ($(DARWIN),)
-         NVCUVIDLIB := -Lcommon/lib/darwin -lnvcuvid
+         NVCUVIDLIB := -L../../common/lib/darwin -lnvcuvid
      endif
 endif
 
 # Libs
 ifneq ($(DARWIN),)
-    LIB       := -L$(CUDA_INSTALL_PATH)/lib -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib $(NVCUVIDLIB) 
+    LIB       := -L$(CUDA_LIB_PATH) -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib $(NVCUVIDLIB) 
 else
   ifeq "$(strip $(HP_64))" ""
     ifeq ($(x86_64),1)
-       LIB       := -L$(CUDA_INSTALL_PATH)/lib64 -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib 
+       LIB       := -L$(CUDA_LIB_PATH)64 -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib 
     else
-       LIB       := -L$(CUDA_INSTALL_PATH)/lib -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib
+       LIB       := -L$(CUDA_LIB_PATH) -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib
     endif
   else
     ifeq ($(i386),1)
-       LIB       := -L$(CUDA_INSTALL_PATH)/lib -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib
+       LIB       := -L$(CUDA_LIB_PATH) -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib
     else
-       LIB       := -L$(CUDA_INSTALL_PATH)/lib64 -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib
+       LIB       := -L$(CUDA_LIB_PATH)64 -L$(LIBDIR) -L$(COMMONDIR)/lib/$(OSLOWER) -L$(SHAREDDIR)/lib
     endif
   endif
 endif
@@ -285,29 +293,25 @@ else
   ifeq ($(USEDRVAPI),1)
      LIB += -lcuda   ${OPENGLLIB} $(PARAMGLLIB) $(RENDERCHECKGLLIB) $(CUDPPLIB) ${LIB} 
   else
-     ifeq ($(emu),1) 
-         LIB += -lcudartemu
-     else 
-         LIB += -lcudart
-     endif
+     LIB += -lcudart
      LIB += ${OPENGLLIB} $(PARAMGLLIB) $(RENDERCHECKGLLIB) $(CUDPPLIB) ${LIB}
   endif
 endif
 
 ifeq ($(USECUFFT),1)
-  ifeq ($(emu),1)
-    LIB += -lcufftemu
-  else
     LIB += -lcufft
-  endif
 endif
 
 ifeq ($(USECUBLAS),1)
-  ifeq ($(emu),1)
-    LIB += -lcublasemu
-  else
     LIB += -lcublas
-  endif
+endif
+
+ifeq ($(USECURAND),1)
+    LIB += -lcurand
+endif
+
+ifeq ($(USECUSPARSE),1)
+    LIB += -lcusparse
 endif
 
 # Lib/exe configuration
@@ -319,18 +323,13 @@ else
 	ifneq ($(OMIT_CUTIL_LIB),1)
 		LIB += -lcutil_$(LIB_ARCH)$(LIBSUFFIX) -lshrutil_$(LIB_ARCH)$(LIBSUFFIX)
 	endif
-	# Device emulation configuration
-	ifeq ($(emu), 1)
-		NVCCFLAGS   += -deviceemu
-		CUDACCFLAGS += 
-		BINSUBDIR   := emu$(BINSUBDIR)
-		# consistency, makes developing easier
-		CXXFLAGS		+= -D__DEVICE_EMULATION__
-		CFLAGS			+= -D__DEVICE_EMULATION__
-	endif
 	TARGETDIR := $(BINDIR)/$(BINSUBDIR)
 	TARGET    := $(TARGETDIR)/$(EXECUTABLE)
 	LINKLINE  = $(LINK) -o $(TARGET) $(OBJS) $(LIB)
+
+	ifeq ($(OSNAME),Linux)
+	     LINKLINE += -ldl -lpthread
+	endif
 endif
 
 # check if verbose 
@@ -353,7 +352,7 @@ endif
 
 ifeq ($(keep), 1)
 	NVCCFLAGS += -keep
-	NVCC_KEEP_CLEAN := *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx *.cpp
+	NVCC_KEEP_CLEAN := *.i* *.cubin *.cu.c *.cudafe* *.fatbin.c *.ptx
 endif
 
 ifdef maxregisters

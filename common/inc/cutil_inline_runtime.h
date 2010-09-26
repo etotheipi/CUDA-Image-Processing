@@ -1,12 +1,12 @@
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
- * NVIDIA Corporation and its licensors retain all intellectual property and 
- * proprietary rights in and to this software and related documentation. 
- * Any use, reproduction, disclosure, or distribution of this software 
- * and related documentation without an express license agreement from
- * NVIDIA Corporation is strictly prohibited.
- * 
+ * Please refer to the NVIDIA end user license agreement (EULA) associated
+ * with this source code for terms and conditions that govern your use of
+ * this software. Any use, reproduction, disclosure, or distribution of
+ * this software and related documentation outside the terms of the EULA
+ * is strictly prohibited.
+ *
  */
  
 #ifndef _CUTIL_INLINE_FUNCTIONS_RUNTIME_H_
@@ -61,13 +61,43 @@ inline void __cutilExit(int argc, char **argv)
 #define MIN(a,b) ((a < b) ? a : b)
 #define MAX(a,b) ((a > b) ? a : b)
 
+// Beginning of GPU Architecture definitions
+inline int _ConvertSMVer2Cores(int major, int minor)
+{
+	// Defines for GPU Architecture types (using the SM version to determine the # of cores per SM
+	typedef struct {
+		int SM; // 0xMm (hexidecimal notation), M = SM Major version, and m = SM minor version
+		int Cores;
+	} sSMtoCores;
+
+	sSMtoCores nGpuArchCoresPerSM[] = 
+	{ { 0x10,  8 },
+	  { 0x11,  8 },
+	  { 0x12,  8 },
+	  { 0x13,  8 },
+	  { 0x20, 32 },
+	  { 0x21, 48 },
+	  {   -1, -1 } 
+	};
+
+	int index = 0;
+	while (nGpuArchCoresPerSM[index].SM != -1) {
+		if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor) ) {
+			return nGpuArchCoresPerSM[index].Cores;
+		}
+		index++;
+	}
+	printf("MapSMtoCores undefined SMversion %d.%d!\n", major, minor);
+	return -1;
+}
+// end of GPU Architecture definitions
+
 // This function returns the best GPU (with maximum GFLOPS)
 inline int cutGetMaxGflopsDeviceId()
 {
 	int current_device   = 0, sm_per_multiproc = 0;
 	int max_compute_perf = 0, max_perf_device  = 0;
 	int device_count     = 0, best_SM_arch     = 0;
-    int arch_cores_sm[3] = { 1, 8, 32 };
 	cudaDeviceProp deviceProp;
 
 	cudaGetDeviceCount( &device_count );
@@ -86,10 +116,8 @@ inline int cutGetMaxGflopsDeviceId()
 		cudaGetDeviceProperties( &deviceProp, current_device );
 		if (deviceProp.major == 9999 && deviceProp.minor == 9999) {
 		    sm_per_multiproc = 1;
-		} else if (deviceProp.major <= 2) {
-			sm_per_multiproc = arch_cores_sm[deviceProp.major];
 		} else {
-			sm_per_multiproc = arch_cores_sm[2];
+			sm_per_multiproc = _ConvertSMVer2Cores(deviceProp.major, deviceProp.minor);
 		}
 
 		int compute_perf  = deviceProp.multiProcessorCount * sm_per_multiproc * deviceProp.clockRate;
@@ -220,10 +248,10 @@ inline void __cutilSafeMalloc( void *pointer, const char *file, const int line )
 }
 
 #if __DEVICE_EMULATION__
-    inline void cutilDeviceInit(int ARGC, char **ARGV) { }
-    inline void cutilChooseCudaDevice(int ARGC, char **ARGV) { }
+    inline int cutilDeviceInit(int ARGC, char **ARGV) { }
+    inline int cutilChooseCudaDevice(int ARGC, char **ARGV) { }
 #else
-    inline void cutilDeviceInit(int ARGC, char **ARGV)
+    inline int cutilDeviceInit(int ARGC, char **ARGV)
     {
         int deviceCount;
         cutilSafeCallNoSync(cudaGetDeviceCount(&deviceCount));
@@ -233,29 +261,45 @@ inline void __cutilSafeMalloc( void *pointer, const char *file, const int line )
         }
         int dev = 0;
         cutGetCmdLineArgumenti(ARGC, (const char **) ARGV, "device", &dev);
-	    if (dev < 0) dev = 0;\
-        if (dev > deviceCount-1) dev = deviceCount - 1;
+        if (dev < 0) 
+            dev = 0;
+        if (dev > deviceCount-1) {
+            fprintf(stderr, "cutilDeviceInit (Device=%d) invalid GPU device.  %d GPU device(s) detected.\n\n", dev, deviceCount);
+            return -dev;
+        }  
         cudaDeviceProp deviceProp;
         cutilSafeCallNoSync(cudaGetDeviceProperties(&deviceProp, dev));
         if (deviceProp.major < 1) {
             FPRINTF((stderr, "cutil error: GPU device does not support CUDA.\n"));
             exit(-1);                                                  \
         }
-        if (cutCheckCmdLineFlag(ARGC, (const char **) ARGV, "quiet") == CUTFalse)
-            FPRINTF((stderr, "Using CUDA device [%d]: %s\n", dev, deviceProp.name));
+        printf("> Using CUDA device [%d]: %s\n", dev, deviceProp.name);
         cutilSafeCall(cudaSetDevice(dev));
+
+        return dev;
     }
 
     // General initialization call to pick the best CUDA Device
-    inline void cutilChooseCudaDevice(int argc, char **argv)
+    inline int cutilChooseCudaDevice(int argc, char **argv)
     {
+        cudaDeviceProp deviceProp;
+        int devID = 0;
         // If the command-line has a device number specified, use it
         if( cutCheckCmdLineFlag(argc, (const char**)argv, "device") ) {
-            cutilDeviceInit(argc, argv);
+            devID = cutilDeviceInit(argc, argv);
+            if (devID < 0) {
+               printf("exiting...\n");
+               cutilExit(argc, argv);
+               exit(0);
+            }
         } else {
             // Otherwise pick the device with highest Gflops/s
-            cudaSetDevice( cutGetMaxGflopsDeviceId() );
+            devID = cutGetMaxGflopsDeviceId();
+            cutilSafeCallNoSync( cudaSetDevice( devID ) );
+            cutilSafeCallNoSync( cudaGetDeviceProperties(&deviceProp, devID) );
+            printf("> Using CUDA device [%d]: %s\n", devID, deviceProp.name);
         }
+        return devID;
     }
 #endif
 
@@ -295,8 +339,7 @@ inline bool cutilCudaCapabilities(int major_version, int minor_version)
     if((deviceProp.major > major_version) ||
 	   (deviceProp.major == major_version && deviceProp.minor >= minor_version))
     {
-        printf("> Compute SM %d.%d Device Detected\n", deviceProp.major, deviceProp.minor);
-        printf("> Device %d: <%s>\n", dev, deviceProp.name);
+        printf("> Device %d: <%16s >, Compute SM %d.%d detected\n", dev, deviceProp.name, deviceProp.major, deviceProp.minor);
         return true;
     }
     else

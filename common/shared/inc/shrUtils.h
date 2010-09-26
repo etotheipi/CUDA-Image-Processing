@@ -1,16 +1,12 @@
 /*
 * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
 *
-* NVIDIA Corporation and its licensors retain all intellectual property and 
-* proprietary rights in and to this software and related documentation.
-* Any use, reproduction, disclosure, or distribution of this software
-* and related documentation without an express license agreement from 
-* NVIDIA Corporation is strictly prohibited.
-* 
-* Please refer to the applicable NVIDIA end user license agreement (EULA) 
-* associated with this source code for terms and conditions that govern 
-* your use of this NVIDIA software.
-* 
+* Please refer to the NVIDIA end user license agreement (EULA) associated
+* with this source code for terms and conditions that govern your use of
+* this software. Any use, reproduction, disclosure, or distribution of
+* this software and related documentation outside the terms of the EULA
+* is strictly prohibited.
+*
 */
 
 #ifndef SHR_UTILS_H
@@ -51,9 +47,37 @@
 // Un-comment the following #define to enable profiling code in SDK apps
 //#define GPU_PROFILING
 
-// Defines for GPU Architecture types (using the SM version to determine the # of cores per SM
-static int nGpuArchCoresPerSM[] = { -1, 8, 32 };
+// Beginning of GPU Architecture definitions
+inline int ConvertSMVer2Cores(int major, int minor)
+{
+	// Defines for GPU Architecture types (using the SM version to determine the # of cores per SM
+	typedef struct {
+		int SM; // 0xMm (hexidecimal notation), M = SM Major version, and m = SM minor version
+		int Cores;
+	} sSMtoCores;
+
+	sSMtoCores nGpuArchCoresPerSM[] = 
+	{ { 0x10,  8 },
+	  { 0x11,  8 },
+	  { 0x12,  8 },
+	  { 0x13,  8 },
+	  { 0x20, 32 },
+	  { 0x21, 48 },
+	  {   -1, -1 }
+	};
+
+	int index = 0;
+	while (nGpuArchCoresPerSM[index].SM != -1) {
+		if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor) ) {
+			return nGpuArchCoresPerSM[index].Cores;
+		}
+		index++;
+	}
+	printf("MapSMtoCores undefined SMversion %d.%d!\n", major, minor);
+	return -1;
+}
 // end of GPU Architecture definitions
+
 
 // Defines and enum for use with logging functions
 // *********************************************************************

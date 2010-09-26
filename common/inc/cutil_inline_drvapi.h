@@ -1,15 +1,15 @@
 /*
  * Copyright 1993-2010 NVIDIA Corporation.  All rights reserved.
  *
- * NVIDIA Corporation and its licensors retain all intellectual property and 
- * proprietary rights in and to this software and related documentation. 
- * Any use, reproduction, disclosure, or distribution of this software 
- * and related documentation without an express license agreement from
- * NVIDIA Corporation is strictly prohibited.
- * 
+ * Please refer to the NVIDIA end user license agreement (EULA) associated
+ * with this source code for terms and conditions that govern your use of
+ * this software. Any use, reproduction, disclosure, or distribution of
+ * this software and related documentation outside the terms of the EULA
+ * is strictly prohibited.
+ *
  */
  
- #ifndef _CUTIL_INLINE_FUNCTIONS_DRVAPI_H_
+#ifndef _CUTIL_INLINE_FUNCTIONS_DRVAPI_H_
 #define _CUTIL_INLINE_FUNCTIONS_DRVAPI_H_
 
 #include <stdio.h>
@@ -28,14 +28,44 @@
 #define MIN(a,b) ((a < b) ? a : b)
 #define MAX(a,b) ((a > b) ? a : b)
 
+// Beginning of GPU Architecture definitions
+inline int _ConvertSMVer2CoresDrvApi(int major, int minor)
+{
+	// Defines for GPU Architecture types (using the SM version to determine the # of cores per SM
+	typedef struct {
+		int SM; // 0xMm (hexidecimal notation), M = SM Major version, and m = SM minor version
+		int Cores;
+	} sSMtoCores;
+
+        sSMtoCores nGpuArchCoresPerSM[] =
+        { { 0x10,  8 },
+          { 0x11,  8 },
+          { 0x12,  8 },
+          { 0x13,  8 },
+          { 0x20, 32 },
+          { 0x21, 48 },
+          {   -1, -1 }
+        };
+
+	int index = 0;
+	while (nGpuArchCoresPerSM[index].SM != -1) {
+		if (nGpuArchCoresPerSM[index].SM == ((major << 4) + minor) ) {
+			return nGpuArchCoresPerSM[index].Cores;
+		}
+		index++;
+	}
+	printf("MapSMtoCores undefined SMversion %d.%d!\n", major, minor);
+	return -1;
+}
+// end of GPU Architecture definitions
+
 // This function returns the best GPU based on performance
 inline int cutilDrvGetMaxGflopsDeviceId()
 {
     CUdevice current_device = 0, max_perf_device = 0;
     int device_count     = 0, sm_per_multiproc = 0;
-	int max_compute_perf = 0, best_SM_arch     = 0;
+    int max_compute_perf = 0, best_SM_arch     = 0;
     int major = 0, minor = 0, multiProcessorCount, clockRate;
-    int arch_cores_sm[3] = { 1, 8, 32 };
 
     cuInit(0);
     CU_SAFE_CALL_NO_SYNC(cuDeviceGetCount(&device_count));
@@ -53,18 +83,17 @@ inline int cutilDrvGetMaxGflopsDeviceId()
 	current_device = 0;
 	while( current_device < device_count ) {
 		CU_SAFE_CALL_NO_SYNC( cuDeviceGetAttribute( &multiProcessorCount, 
-			                                        CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, 
-													current_device ) );
-		CU_SAFE_CALL_NO_SYNC( cuDeviceGetAttribute( &clockRate, 
-			                                        CU_DEVICE_ATTRIBUTE_CLOCK_RATE, 
-													current_device ) );
+                                                            CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, 
+                                                            current_device ) );
+        CU_SAFE_CALL_NO_SYNC( cuDeviceGetAttribute( &clockRate, 
+                                                            CU_DEVICE_ATTRIBUTE_CLOCK_RATE, 
+                                                            current_device ) );
+		CU_SAFE_CALL_NO_SYNC( cuDeviceComputeCapability(&major, &minor, current_device ) );
 
 		if (major == 9999 && minor == 9999) {
 		    sm_per_multiproc = 1;
-		} else if (major <= 2) {
-			sm_per_multiproc = arch_cores_sm[major];
 		} else {
-			sm_per_multiproc = arch_cores_sm[2];
+		    sm_per_multiproc = _ConvertSMVer2CoresDrvApi(major, minor);
 		}
 
 		int compute_perf  = multiProcessorCount * sm_per_multiproc * clockRate;
@@ -73,12 +102,83 @@ inline int cutilDrvGetMaxGflopsDeviceId()
 			if ( best_SM_arch > 2 ) {
 				// If our device==dest_SM_arch, choose this, or else pass
 				if (major == best_SM_arch) {	
-					max_compute_perf  = compute_perf;
-					max_perf_device   = current_device;
+                                     max_compute_perf  = compute_perf;
+                                     max_perf_device   = current_device;
 				}
 			} else {
 				max_compute_perf  = compute_perf;
 				max_perf_device   = current_device;
+			}
+		}
+		++current_device;
+	}
+	return max_perf_device;
+}
+
+// This function returns the best Graphics GPU based on performance
+inline int cutilDrvGetMaxGflopsGraphicsDeviceId()
+{
+    CUdevice current_device = 0, max_perf_device = 0;
+    int device_count     = 0, sm_per_multiproc = 0;
+    int max_compute_perf = 0, best_SM_arch     = 0;
+    int major = 0, minor = 0, multiProcessorCount, clockRate;
+	int bTCC = 0;
+	char deviceName[256];
+
+    cuInit(0);
+    CU_SAFE_CALL_NO_SYNC(cuDeviceGetCount(&device_count));
+
+	// Find the best major SM Architecture GPU device
+	while ( current_device < device_count ) {
+		CU_SAFE_CALL_NO_SYNC( cuDeviceGetName(deviceName, 256, current_device) );
+		CU_SAFE_CALL_NO_SYNC( cuDeviceComputeCapability(&major, &minor, current_device ) );
+
+		if (major > 0 && major < 9999) {
+			best_SM_arch = MAX(best_SM_arch, major);
+		}
+		current_device++;
+	}
+
+    // Find the best CUDA capable GPU device
+	current_device = 0;
+	while( current_device < device_count ) {
+		CU_SAFE_CALL_NO_SYNC( cuDeviceGetAttribute( &multiProcessorCount, 
+                                                            CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT, 
+                                                            current_device ) );
+        CU_SAFE_CALL_NO_SYNC( cuDeviceGetAttribute( &clockRate, 
+                                                            CU_DEVICE_ATTRIBUTE_CLOCK_RATE, 
+                                                            current_device ) );
+		CU_SAFE_CALL_NO_SYNC( cuDeviceComputeCapability(&major, &minor, current_device ) );
+
+#if CUDA_VERSION >= 3020
+		CU_SAFE_CALL_NO_SYNC( cuDeviceGetAttribute( &bTCC,  CU_DEVICE_ATTRIBUTE_TCC_DRIVER, current_device ) );
+#else
+		// Assume a Tesla GPU is running in TCC if we are running CUDA 3.1
+		if (deviceName[0] == 'T') bTCC = 1;
+#endif
+
+		if (major == 9999 && minor == 9999) {
+		    sm_per_multiproc = 1;
+		} else {
+		    sm_per_multiproc = _ConvertSMVer2CoresDrvApi(major, minor);
+		}
+
+		// If this is a Tesla based GPU and SM 2.0, and TCC is disabled, this is a contendor
+		if ((major >= 2) && !bTCC) 
+		{
+			int compute_perf  = multiProcessorCount * sm_per_multiproc * clockRate;
+			if( compute_perf  > max_compute_perf ) {
+				// If we find GPU with SM major > 2, search only these
+				if ( best_SM_arch > 2 ) {
+					// If our device==dest_SM_arch, choose this, or else pass
+					if (major == best_SM_arch) {	
+										 max_compute_perf  = compute_perf;
+										 max_perf_device   = current_device;
+					}
+				} else {
+					max_compute_perf  = compute_perf;
+					max_perf_device   = current_device;
+				}
 			}
 		}
 		++current_device;
@@ -123,11 +223,11 @@ inline void __cuCheckMsg( const char * msg, const char *file, const int line )
 
 
 #if __DEVICE_EMULATION__
-    inline void cutilDeviceInitDrv(int cuDevice, int ARGC, char **ARGV) { } 
+    inline int cutilDeviceInitDrv(int ARGC, char **ARGV) { } 
 #else
-    inline void cutilDeviceInitDrv(int cuDevice, int ARGC, char ** ARGV) 
+    inline int cutilDeviceInitDrv(int ARGC, char ** ARGV) 
     {
-        cuDevice = 0;
+        int cuDevice = 0;
         int deviceCount = 0;
         CUresult err = cuInit(0);
         if (CUDA_SUCCESS == err)
@@ -138,15 +238,50 @@ inline void __cuCheckMsg( const char * msg, const char *file, const int line )
         }
         int dev = 0;
         cutGetCmdLineArgumenti(ARGC, (const char **) ARGV, "device", &dev);
-	    if (dev < 0) dev = 0;
-        if (dev > deviceCount-1) dev = deviceCount - 1;
+        if (dev < 0) dev = 0;
+        if (dev > deviceCount-1) {
+           fprintf(stderr, "cutilDeviceInitDrv (Device=%d) invalid GPU device.  %d GPU device(s) detected.\n\n", dev, deviceCount);
+           return -dev;
+        }
         cutilDrvSafeCallNoSync(cuDeviceGet(&cuDevice, dev));
         char name[100];
         cuDeviceGetName(name, 100, cuDevice);
-        if (cutCheckCmdLineFlag(ARGC, (const char **) ARGV, "quiet") == CUTFalse)
-            fprintf(stderr, "Using CUDA device [%d]: %s\n", dev, name);
+        if (cutCheckCmdLineFlag(ARGC, (const char **) ARGV, "quiet") == CUTFalse) {
+           printf("> Using CUDA Device [%d]: %s\n", dev, name);
+       	}
+        return dev;
     }
 #endif
+
+    // General initialization call to pick the best CUDA Device
+#if __DEVICE_EMULATION__
+    inline CUdevice cutilChooseCudaDeviceDrv(int argc, char **argv, int *p_devID)
+#else
+    inline CUdevice cutilChooseCudaDeviceDrv(int argc, char **argv, int *p_devID)
+    {
+        CUdevice cuDevice;
+        int devID = 0;
+        // If the command-line has a device number specified, use it
+        if( cutCheckCmdLineFlag(argc, (const char**)argv, "device") ) {
+            devID = cutilDeviceInitDrv(argc, argv);
+            if (devID < 0) {
+                printf("exiting...\n");
+                exit(0);
+            }
+        } else {
+            // Otherwise pick the device with highest Gflops/s
+            char name[100];
+            devID = cutilDrvGetMaxGflopsDeviceId();
+            cutilDrvSafeCallNoSync(cuDeviceGet(&cuDevice, devID));
+            cuDeviceGetName(name, 100, cuDevice);
+            printf("> Using CUDA Device [%d]: %s\n", devID, name);
+        }
+        cuDeviceGet(&cuDevice, devID);
+        if (p_devID) *p_devID = devID;
+        return cuDevice;
+    }
+#endif
+
 
 //! Check for CUDA context lost
 inline void cutilDrvCudaCheckCtxLost(const char *errorMessage, const char *file, const int line ) 
@@ -182,8 +317,7 @@ inline bool cutilDrvCudaDevCapabilities(int major_version, int minor_version, in
     if((major > major_version) ||
 	   (major == major_version && minor >= minor_version))
     {
-        printf("> Compute SM %d.%d Device Detected\n", major, minor);
-        printf("> Device %d: <%s>\n", dev, device_name);
+        printf("> Device %d: < %s >, Compute SM %d.%d detected\n", dev, device_name, major, minor);
         return true;
     }
     else
