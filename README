@@ -3,6 +3,13 @@ Image Processing in C++ using CUDA
 
 Ridiculously fast morphology and convolutions using an NVIDIA GPU!
 
+Additional:  cudaImageHost<type>    and 
+             cudaImageDevice<type> 
+   Automate all the "standard" CUDA memory operations needed for any 
+   numeric data type.  The can be used to learn how to allocate and 
+   move basic memory between host and device, and can be used to 
+   soften the learning curve when implementing CUDA programs (memory
+   allocation/copy issues are frustrating to track down)
 
 -----
 Orig Author:  Alan Reiner
@@ -22,11 +29,10 @@ the CPU would take anywhere from 5 to 20 seconds.  Using this library
 with an NVIDIA GTX 460, the operation takes less than 0.1 seconds!  You
 can see nearly identical speed improvements with morphological operations.
 
-To use this library, you will need the CUDA 3.1 toolkit, and you might
+To use this library, you will need the CUDA 3.2 toolkit, and you might
 have to move a few libraries into your linker path.  And of course, you
 need a CUDA-enabled graphics card (Fermi recommended, others will prob
 work;  more on that below).
-
 
 This library is designed to be used for performing a sequence of image
 operations on a single image/mask, only copying the data in and out of 
@@ -46,7 +52,8 @@ will not be favorable to OSS projects.
       THIS MAKEFILE ERASES *.cpp FILES WHEN CALLING "make clean"
 
    I don't know how to fix this.  Perhaps someone else knows.  Just be sure
-   to check-in your cpp code before cleaning.
+   to check-in your cpp code before cleaning (though, this project no longer
+   contains any .cpp files)
    
 
 -----
@@ -59,7 +66,8 @@ Supported Hardware:
    about compiling for 1.X GPUs)
 
    I believe NVIDIA 8800 GT is the earliest NVIDIA card that supports
-   CUDA, and it would be Compute Capability 1.0.
+   CUDA, and it would be Compute Capability 1.0. (correction: I believe
+   all NVIDIA 8XXX cards support CUDA 1.0)
 
    CUDA was created by NVIDIA, for NVIDIA.  It will not work ATI cards.
    If you want to take up GPU-programming on ATI, the only two options
@@ -75,12 +83,14 @@ Installing and running:
    the image convolution code, besides the CUDA 3.1 toolkit
    which can be downloaded from the following website:
 
-      http://developer.nvidia.com/object/cuda_3_1_downloads.html
+      http://developer.nvidia.com/object/cuda_3_2_toolkit_rc.html
 
    In addition to installing the toolkit, you might need to add 
    libcutil*.a and libshrutil*.a to your LD path.  In linux,
    it is sufficient to copy them to your /usr/local/cuda/lib[64] 
-   directory.
+   directory.  (note these two libraries are not formally part of
+   NVIDIA CUDA toolbox, but come with the SDK as a set of tools for 
+   simplifying many CUDA tasks, like checking error codes)
 
    I personally work with space-separated files for images, because 
    they are trivial to read and write from C++.  Additionally, I 
@@ -97,7 +107,7 @@ Installing and running:
 
 
 -----
-To work with older NVIDIA cards (8800+ GT, 9XXX GT, GTX 2XX):
+To work with "older" NVIDIA cards (8XXX GT, 9XXX GT, GTX 2XX):
 
    Open commom/common.mk and around line 150, uncomment the GENCODE_SM10
    line, which enables dual-compilation for CUDA Compute Capability 1.X
@@ -112,6 +122,12 @@ To work with older NVIDIA cards (8800+ GT, 9XXX GT, GTX 2XX):
 -----
 Planned Updates
 
+   - I have basic HOST and DEVICE memory automated with cudaImageHost<type>
+     and cudaImageDevice<type>... but texture, constant, and page-locked
+     memory still requires manual operation.  I will create similar classes
+     that handle the allocation and copying of such data (especially textures
+     because there's a lot of fluff to preparing that data)
+
    - Need to modify the kernel functions (or invocations) to handle masks
      that have arbitrary dimensions.  Currently, it is assumed that the
      input has dimensions that are multiples of 32.
@@ -120,7 +136,11 @@ Planned Updates
      based on CUDA architecture.  It may be as simple as choosing new block
      sizes, or reworking some of the algorithms.  The point is, the code is
      currently written with Compute Capability 2.0+ in mind, and who knows
-     what happens when run on 1.X device.
+     what happens when run on 1.X device. (NOTE:  one major difference between
+     1.X and 2.X is that 1.X is optimized for 24-bit integer operations, 2.x
+     is optimized for 32-bit integer operations.  Using the wrong ones for
+     the given architecture can produce factor of 8-32 slowdown, this most
+     definitely needs to be addressed in a preprocessor somewhere)
 
    - Right now my focus has been on morphology, though regular convolution
      HAS been implemented.  I will implement a more-exhaustive array of 
@@ -262,10 +282,10 @@ Developer Stuff - to expand this library
    a different set of tools, and does everything manually.
    
    Second thing to note is that the getBufPtrAny command has the following
-   domain:
+   range of valid inputs:
 
       {A=-1000, B=-1001, 1, 2, 3, 4, ..., -1, -2, -3, -4 ...}
-      |     PRIMARY    |      EXTRA     |    TEMPORARY      |
+      |     PRIMARY     |      EXTRA     |    TEMPORARY     |
 
    The USER has access to PRIMARY & EXTRA (getBufferPtr won't accept neg vals)
    The DEVELOPER has access to all, but should only use PRIMARY & TEMP
