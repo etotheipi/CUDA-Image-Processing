@@ -8,7 +8,7 @@
 
 /////////////////////////////////////////////////////////////////////////////
 // The static data members in the IWB class
-vector<cudaImageDevice> ImageWorkbench::masterListSE_(0);
+vector<cudaImageDevice<int> > ImageWorkbench::masterListSE_(0);
 vector<int>             ImageWorkbench::masterListSENZ_(0);
 
 
@@ -18,7 +18,7 @@ vector<int>             ImageWorkbench::masterListSENZ_(0);
 int ImageWorkbench::addStructElt(int* seHostPtr, int nRows, int nCols)
 {
    int newIndex = (int)masterListSE_.size();
-   cudaImageDevice seDev;
+   cudaImageDevice<int> seDev;
    masterListSE_.push_back( seDev );
    masterListSE_[newIndex].copyFromHost(seHostPtr, nRows, nCols);
    
@@ -32,7 +32,7 @@ int ImageWorkbench::addStructElt(int* seHostPtr, int nRows, int nCols)
 }
 
 /////////////////////////////////////////////////////////////////////////////
-int ImageWorkbench::addStructElt(cudaImageHost const & seHost)
+int ImageWorkbench::addStructElt(cudaImageHost<int> const & seHost)
 {
    return addStructElt(seHost.getDataPtr(), seHost.numRows(), seHost.numCols());
 }
@@ -55,7 +55,7 @@ void ImageWorkbench::setBlockSize2D(int nRows, int nCols)
 void ImageWorkbench::createExtraBuffer(void)
 {
    int newIndex = (int)extraBuffers_.size();
-   cudaImageDevice newBuf;
+   cudaImageDevice<int> newBuf;
    extraBuffers_.push_back(newBuf);
    extraBuffers_[newIndex].resize(imgRows_, imgCols_);
 }
@@ -71,7 +71,7 @@ void ImageWorkbench::createTempBuffer(void)
 {
    int newIndex = (int)tempBuffers_.size();
 
-   cudaImageDevice newBuf;
+   cudaImageDevice<int> newBuf;
    tempBuffers_.push_back(newBuf);
    tempBuffers_[newIndex].resize(imgRows_, imgCols_);
 
@@ -99,7 +99,7 @@ ImageWorkbench::ImageWorkbench() :
 }
 
 
-ImageWorkbench::ImageWorkbench(cudaImageHost const & hostImg) :
+ImageWorkbench::ImageWorkbench(cudaImageHost<int> const & hostImg) :
    imgRows_(0),
    imgCols_(0),
    imgElts_(0),
@@ -111,7 +111,7 @@ ImageWorkbench::ImageWorkbench(cudaImageHost const & hostImg) :
 }
 
 /////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
+void ImageWorkbench::Initialize(cudaImageHost<int> const & hostImg)
 {
 
 
@@ -141,8 +141,8 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
    cout << endl;
    */
 
-   extraBuffers_ = vector<cudaImageDevice>(0);
-   tempBuffers_  = vector<cudaImageDevice>(0);
+   extraBuffers_ = vector<cudaImageDevice<int> >(0);
+   tempBuffers_  = vector<cudaImageDevice<int> >(0);
    tempBuffersLockFlag_  = vector<bool>(0);
 
    buffer1_.copyFromHost(hostImg);
@@ -157,20 +157,20 @@ void ImageWorkbench::Initialize(cudaImageHost const & hostImg)
 
 /////////////////////////////////////////////////////////////////////////////
 // These methods are used to push/pull main buffer to/from external locations
-void ImageWorkbench::copyBufferToHost(cudaImageHost & hostOut) const
+void ImageWorkbench::copyBufferToHost(cudaImageHost<int> & hostOut) const
 {
    bufferPtrA_->copyToHost(hostOut);
 }
 
 /////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::copyBufferToDevice(cudaImageDevice & devOut) const
+void ImageWorkbench::copyBufferToDevice(cudaImageDevice<int> & devOut) const
 {
    bufferPtrA_->copyToHost(devOut);
 }
 
 /////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::copyBufferToHost( int bufIdx,
-                                       cudaImageHost & hostOut) const
+                                       cudaImageHost<int> & hostOut) const
 {
    // Need to do it this way because using getBufferPtr() is not const and
    // I want this function to be const
@@ -185,7 +185,7 @@ void ImageWorkbench::copyBufferToHost( int bufIdx,
 }
 /////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::copyBufferToDevice( int bufIdx,
-                                         cudaImageDevice & devOut) const
+                                         cudaImageDevice<int> & devOut) const
 {
    if(bufIdx == A)
       bufferPtrA_->copyToDevice(devOut);
@@ -199,7 +199,7 @@ void ImageWorkbench::copyBufferToDevice( int bufIdx,
 
 
 /////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::copyHostToBuffer( cudaImageHost const & hostIn,
+void ImageWorkbench::copyHostToBuffer( cudaImageHost<int> const & hostIn,
                                        int bufIdx)
 {
    if(hostIn.numRows() == imgRows_ && hostIn.numCols() == imgCols_)
@@ -212,7 +212,7 @@ void ImageWorkbench::copyHostToBuffer( cudaImageHost const & hostIn,
 }
 
 /////////////////////////////////////////////////////////////////////////////
-void ImageWorkbench::copyDeviceToBuffer( cudaImageDevice const & devIn,
+void ImageWorkbench::copyDeviceToBuffer( cudaImageDevice<int> const & devIn,
                                          int bufIdx)
 {
    if(devIn.numRows() == imgRows_ && devIn.numCols() == imgCols_)
@@ -269,15 +269,15 @@ void ImageWorkbench::releaseTempBuffer(int bufIdx)
 }
 
 /////////////////////////////////////////////////////////////////////////////
-cudaImageDevice* ImageWorkbench::getBufferPtr( int idx )
+cudaImageDevice<int>* ImageWorkbench::getBufferPtr( int idx )
 {
    return getBufPtrAny(idx, false);
 }
 
 /////////////////////////////////////////////////////////////////////////////
-cudaImageDevice* ImageWorkbench::getBufPtrAny( int idx, bool allowTemp)
+cudaImageDevice<int>* ImageWorkbench::getBufPtrAny( int idx, bool allowTemp)
 {
-   cudaImageDevice* out = NULL;
+   cudaImageDevice<int>* out = NULL;
 
    if(idx == A)
       out = bufferPtrA_;
@@ -318,7 +318,7 @@ cudaImageDevice* ImageWorkbench::getBufPtrAny( int idx, bool allowTemp)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::GenericMorphOp(int seIndex, int targSum, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
@@ -334,7 +334,7 @@ void ImageWorkbench::GenericMorphOp(int seIndex, int targSum, int srcBuf, int ds
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::HitOrMiss(int seIndex, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
@@ -361,7 +361,7 @@ void ImageWorkbench::Erode(int seIndex, int srcBuf, int dstBuf)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::Dilate(int seIndex, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
@@ -377,7 +377,7 @@ void ImageWorkbench::Dilate(int seIndex, int srcBuf, int dstBuf)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::Median(int seIndex, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufferPtr(srcBuf)->getDataPtr(),
@@ -443,16 +443,16 @@ void ImageWorkbench::Close(void)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::CopyBuffer(int dstBuf, int srcBuf)
 { 
-   cudaImageDevice* src = getBufferPtr(srcBuf);
-   cudaImageDevice* dst = getBufferPtr(dstBuf);
+   cudaImageDevice<int>* src = getBufferPtr(srcBuf);
+   cudaImageDevice<int>* dst = getBufferPtr(dstBuf);
    dst->copyFromDevice(*src);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZCopyBuffer(int dstBuf, int srcBuf=A)
 { 
-   cudaImageDevice* src = getBufPtrAny(srcBuf);
-   cudaImageDevice* dst = getBufPtrAny(dstBuf);
+   cudaImageDevice<int>* src = getBufPtrAny(srcBuf);
+   cudaImageDevice<int>* dst = getBufPtrAny(dstBuf);
    dst->copyFromDevice(*src);
 }
 
@@ -554,7 +554,7 @@ int ImageWorkbench::CountChanged(void)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZGenericMorphOp(int seIndex, int targSum, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
@@ -570,7 +570,7 @@ void ImageWorkbench::ZGenericMorphOp(int seIndex, int targSum, int srcBuf, int d
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZHitOrMiss(int seIndex,  int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
@@ -597,7 +597,7 @@ void ImageWorkbench::ZErode(int seIndex, int srcBuf, int dstBuf)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZDilate(int seIndex, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),
@@ -613,7 +613,7 @@ void ImageWorkbench::ZDilate(int seIndex, int srcBuf, int dstBuf)
 ////////////////////////////////////////////////////////////////////////////////
 void ImageWorkbench::ZMedian(int seIndex, int srcBuf, int dstBuf)
 {
-   cudaImageDevice* se = &masterListSE_[seIndex];
+   cudaImageDevice<int>* se = &masterListSE_[seIndex];
 
    Morph_Generic_Kernel<<<GRID_2D_,BLOCK_2D_>>>(
                   getBufPtrAny(srcBuf, true)->getDataPtr(),

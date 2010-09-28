@@ -169,18 +169,18 @@ private:
 
 
    // Image data will jump back and forth between buf 1 and 2, each operation
-   cudaImageDevice buffer1_;
-   cudaImageDevice buffer2_;
+   cudaImageDevice<int> buffer1_;
+   cudaImageDevice<int> buffer2_;
 
    // These two pointers will switch after every operation
-   cudaImageDevice* bufferPtrA_;
-   cudaImageDevice* bufferPtrB_;
+   cudaImageDevice<int>* bufferPtrA_;
+   cudaImageDevice<int>* bufferPtrB_;
 
    // The user should be to be able to allocate extra buffers 
-   vector<cudaImageDevice> extraBuffers_;
+   vector<cudaImageDevice<int> > extraBuffers_;
 
    // Temporary buffers will be needed to carry our internal operations
-   vector<cudaImageDevice> tempBuffers_;
+   vector<cudaImageDevice<int> > tempBuffers_;
 
    // We need to have locking, though, so that nested internal operations
    // don't overwrite buffers that are in use by the calling method
@@ -189,7 +189,7 @@ private:
    void releaseTempBuffer(int bufIdx);
 
    // Keep a master list of SEs and non-zero counts
-   static vector<cudaImageDevice> masterListSE_;
+   static vector<cudaImageDevice<int> > masterListSE_;
    static vector<int>             masterListSENZ_;
 
 
@@ -200,7 +200,7 @@ private:
    void deleteTempBuffer(void);
 
    // This method can get any buffer, PRIMARY, EXTRA or TEMP
-   cudaImageDevice* getBufPtrAny(int idx, bool allowTemp=true);
+   cudaImageDevice<int>* getBufPtrAny(int idx, bool allowTemp=true);
 
    // All operations that don't specify src/dst will call this at the end
    // It switches bufA and bufB so that the next operation will use the 
@@ -210,23 +210,23 @@ private:
 public:
 
    // Primary constructor
-   void Initialize(cudaImageHost const & hostImg);
+   void Initialize(cudaImageHost<int> const & hostImg);
    ImageWorkbench();
-   ImageWorkbench(cudaImageHost const & hostImg);
+   ImageWorkbench(cudaImageHost<int> const & hostImg);
 
    // IWB maintains a static list of all SEs, and we access them by index
    static int addStructElt(int* hostSE, int nRows, int nCols);
-   static int addStructElt(cudaImageHost const & seHost);
+   static int addStructElt(cudaImageHost<int> const & seHost);
 
-   static cudaImageDevice const * getStructEltPtr(int i) {return &masterListSE_[i];}
+   static cudaImageDevice<int> const * getStructEltPtr(int i) {return &masterListSE_[i];}
 
    // This method is used to push/pull data to/from external locations
-   void copyBufferToHost  ( int buf, cudaImageHost   & hostOut) const;
-   void copyBufferToDevice( int buf, cudaImageDevice & hostOut) const;
-   void copyBufferToHost  ( cudaImageHost   & hostOut) const;
-   void copyBufferToDevice( cudaImageDevice & hostOut) const;
-   void copyHostToBuffer  ( cudaImageHost   const & hostIn, int buf=A);
-   void copyDeviceToBuffer( cudaImageDevice const & hostIn, int buf=A);
+   void copyBufferToHost  ( int buf, cudaImageHost<int>   & hostOut) const;
+   void copyBufferToDevice( int buf, cudaImageDevice<int> & hostOut) const;
+   void copyBufferToHost  ( cudaImageHost<int>   & hostOut) const;
+   void copyBufferToDevice( cudaImageDevice<int> & hostOut) const;
+   void copyHostToBuffer  ( cudaImageHost<int>   const & hostIn, int buf=A);
+   void copyDeviceToBuffer( cudaImageDevice<int> const & hostIn, int buf=A);
 
    // GPU Kernel geometry
    void setBlockSize1D(int nthreads);
@@ -239,7 +239,7 @@ public:
 
    // This function can be used to access buffers directly, to copy data in 
    // or out of the workbench.  User can only access PRIMARY and EXTRA buffers
-   cudaImageDevice* getBufferPtr(int bufIdx);
+   cudaImageDevice<int>* getBufferPtr(int bufIdx);
 
 
    

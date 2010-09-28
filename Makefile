@@ -36,9 +36,9 @@
 # Add source files here
 EXECUTABLE	:= convolution
 # CUDA source files (compiled with cudacc)
-CUFILES		:= unitTests.cu cudaImageHost.cpp cudaImageDevice.cu cudaConvUtilities.cu cudaConvolution.cu cudaMorphology.cu ImageWorkbench.cu
+CUFILES		:= unitTests.cu cudaConvUtilities.cu cudaConvolution.cu cudaMorphology.cu ImageWorkbench.cu
 # CUDA dependency files
-CU_DEPS		:= cudaImageDevice.h.cu cudaConvUtilities.h.cu cudaConvolution.h.cu cudaMorphology.h.cu ImageWorkbench.h.cu
+CU_DEPS		:= cudaImageHost.h cudaImageDevice.h.cu cudaConvUtilities.h.cu cudaConvolution.h.cu cudaMorphology.h.cu ImageWorkbench.h.cu
 # C/C++ source files (compiled with gcc / c++)
 CCPFILES		:= 
 

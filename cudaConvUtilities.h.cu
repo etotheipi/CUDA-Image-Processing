@@ -340,7 +340,7 @@ int createBinaryCircle(int* targPtr,
                        int  diameter);
 
 // Assume diameter^2 target memory has already been allocated
-cudaImageHost createBinaryCircle( int diameter);
+cudaImageHost<int> createBinaryCircle( int diameter);
 
 
 

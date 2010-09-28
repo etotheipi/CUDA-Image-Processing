@@ -144,8 +144,8 @@ void runCudaImageUnitTests(void)
    for(int i=0; i<testPixels; i++)
       test[i] = i;
 
-   cudaImageHost h_img(test, d, d);
-   cudaImageHost h_img1(test, d, d);
+   cudaImageHost<int> h_img(test, d, d);
+   cudaImageHost<int> h_img1(test, d, d);
    free(test);
 
 
@@ -158,45 +158,45 @@ void runCudaImageUnitTests(void)
    printf("Passed?  %d \n", (int)(h_img1==h_img));
 
    printf("\t%-50s", "Testing ImageHost copy constructor");
-   cudaImageHost h_img2(h_img1);
+   cudaImageHost<int> h_img2(h_img1);
    printf("Passed?  %d \n", (int)(h_img2==h_img));
 
    printf("\t%-50s", "Testing ImageHost operator=()");
-   cudaImageHost h_img3 = h_img2;
+   cudaImageHost<int> h_img3 = h_img2;
    printf("Passed?  %d \n", (int)(h_img3==h_img));
 
    printf("\t%-50s", "Testing ImageHost op= with diff img sizes");
-   h_img3 = cudaImageHost(6,6);
+   h_img3 = cudaImageHost<int>(6,6);
    h_img3 = h_img2;
    printf("Passed?  %d \n", (int)(h_img3==h_img));
 
    printf("\t%-50s","Testing ImageDevice constructor and copyToHost");
-   cudaImageDevice d_img1(h_img3);
-   cudaImageHost h_img4(d, d);
+   cudaImageDevice<int> d_img1(h_img3);
+   cudaImageHost<int> h_img4(d, d);
    d_img1.copyToHost(h_img4);
    printf("Passed?  %d \n", (int)(h_img4==h_img));
    
    printf("\t%-50s","Testing ImageDevice copyFromHost and copyToHost");
-   cudaImageDevice d_img2;
+   cudaImageDevice<int> d_img2;
    d_img2.copyFromHost(h_img4);
-   cudaImageHost h_img5(d,d);
+   cudaImageHost<int> h_img5(d,d);
    d_img2.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
 
    printf("\t%-50s","Testing ImageDevice another constructor");
-   cudaImageDevice d_img3(d, d);
+   cudaImageDevice<int> d_img3(d, d);
    d_img3.copyFromHost(h_img3);
    d_img3.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
 
    printf("\t%-50s","Testing ImageDevice one more constructor");
-   cudaImageDevice d_img4(d+1, d+1);
+   cudaImageDevice<int> d_img4(d+1, d+1);
    d_img4.copyFromHost(h_img3);
    d_img4.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
 
    printf("\t%-50s","Testing ImageDevice Device2Device");
-   cudaImageDevice d_img5(d+1, d+1);
+   cudaImageDevice<int> d_img5(d+1, d+1);
    d_img5.copyFromDevice(h_img4);
    d_img5.copyToHost(h_img5);
    printf("Passed?  %d \n", (int)(h_img5==h_img));
@@ -205,7 +205,7 @@ void runCudaImageUnitTests(void)
 
 
    cout << "\tCheck current device memory usage:" << endl;
-   cudaImageDevice::calculateDeviceMemoryUsage(true);
+   cudaImageDevice<int>::calculateDeviceMemoryUsage(true);
 
    cout << "****************************************";
    cout << "***************************************" << endl;
@@ -232,8 +232,8 @@ void runMorphologyUnitTests()
    printf("\nTesting morphology operations on %dx%d mask.\n", imgW,imgH);
    cout << "Reading mask from " << fn.c_str() << endl << endl;
 
-   cudaImageHost imgIn(fn, imgW, imgH);
-   cudaImageHost imgOut(imgW, imgH);
+   cudaImageHost<int> imgIn(fn, imgW, imgH);
+   cudaImageHost<int> imgOut(imgW, imgH);
 
    imgIn.writeFile("ImageIn.txt");
 
@@ -241,11 +241,11 @@ void runMorphologyUnitTests()
    // A very unique SE for checking coordinate systems
    int se17H = 17;
    int se17W = 17;
-   cudaImageHost se17("asymmPSF_17x17.txt", se17W, se17H);
+   cudaImageHost<int> se17("asymmPSF_17x17.txt", se17W, se17H);
 
    // Circular SE from utilities file
    int seCircD = 5;
-   cudaImageHost seCirc(seCircD, seCircD);
+   cudaImageHost<int> seCirc(seCircD, seCircD);
    int seCircNZ = createBinaryCircle(seCirc.getDataPtr(), seCircD); // return #non-zero
 
    // Display the two SEs
@@ -255,11 +255,11 @@ void runMorphologyUnitTests()
    seCirc.printMask('.','0');
 
    // Allocate Device Memory
-   cudaImageDevice devIn(imgIn);
-   cudaImageDevice devPsf(se17);
-   cudaImageDevice devOut(imgW, imgH);
+   cudaImageDevice<int> devIn(imgIn);
+   cudaImageDevice<int> devPsf(se17);
+   cudaImageDevice<int> devOut(imgW, imgH);
 
-   cudaImageDevice::calculateDeviceMemoryUsage(true);
+   cudaImageDevice<int>::calculateDeviceMemoryUsage(true);
 
 
    int bx = 8;
@@ -317,23 +317,23 @@ void runWorkbenchUnitTests(void)
    cout << "***Testing ImageWorkbench basic operations" << endl << endl;
 
    // Read the salt image from file
-   cudaImageHost imgIn("salt256.txt", 256, 256);
+   cudaImageHost<int> imgIn("salt256.txt", 256, 256);
 
    // Create a place to put the result
-   cudaImageHost imgOut(64, 64);
+   cudaImageHost<int> imgOut(64, 64);
 
    // A very unique SE for checking coordinate systems
-   cudaImageHost se17("asymmPSF_17x17.txt", 17, 17);
+   cudaImageHost<int> se17("asymmPSF_17x17.txt", 17, 17);
 
    // Circular SE from utilities file
    int seCircD = 11;
-   cudaImageHost seCirc(seCircD, seCircD);
+   cudaImageHost<int> seCirc(seCircD, seCircD);
    createBinaryCircle(seCirc.getDataPtr(), seCircD);
 
    // Check that rectangular SEs work, too
    int rectH = 5;
    int rectW = 9;
-   cudaImageHost seRect(rectH, rectW);
+   cudaImageHost<int> seRect(rectH, rectW);
    for(int r=0; r<rectH; r++)
       for(int c=0; c<rectW; c++)
          seRect(r, c) = 1;
@@ -353,7 +353,7 @@ void runWorkbenchUnitTests(void)
    seRect.printMask();
    int seIdxRect9x5  = ImageWorkbench::addStructElt(seRect);
    
-   cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+   cudaImageDevice<int>::calculateDeviceMemoryUsage(true);  // printToStdOut==true
 
 
    /////////////////////////////////////////////////////////////////////////////
@@ -405,7 +405,7 @@ void runWorkbenchUnitTests(void)
    iwb2.copyBufferToHost(imgOut);  // default is always the input buffer A
    imgOut.writeFile("Workbench5c_subtract.txt");
 
-   cudaImageHost cornerDetect(3,3);
+   cudaImageHost<int> cornerDetect(3,3);
    cornerDetect(0,0) = -1;  cornerDetect(1,0) = -1;  cornerDetect(2,0) = 0;
    cornerDetect(0,1) = -1;  cornerDetect(1,1) =  1;  cornerDetect(2,1) = 1;
    cornerDetect(0,2) =  0;  cornerDetect(1,2) =  1;  cornerDetect(2,2) = 0;
@@ -415,13 +415,13 @@ void runWorkbenchUnitTests(void)
    imgOut.writeFile("Workbench5d_findandrmv.txt");
 
    cout << endl << "Checking device memory usage so far: " << endl;
-   cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+   cudaImageDevice<int>::calculateDeviceMemoryUsage(true);  // printToStdOut==true
 
    /////////////////////////////////////////////////////////////////////////////
    /////////////////////////////////////////////////////////////////////////////
    // With a working workbench, we can finally SOLVE A MAZE !!
    cout << endl << "Time to solve a maze! " << endl << endl;
-   cudaImageHost mazeImg("elephantmaze.txt", 512, 512);
+   cudaImageHost<int> mazeImg("elephantmaze.txt", 512, 512);
    ImageWorkbench iwbMaze(mazeImg);
 
    // Morph-close the image [for fun, not necessary], write it to file for ref
@@ -489,7 +489,7 @@ void runWorkbenchUnitTests(void)
 
 
    // Check to see how much device memory we're using right now
-   cudaImageDevice::calculateDeviceMemoryUsage(true);  // printToStdOut==true
+   cudaImageDevice<int>::calculateDeviceMemoryUsage(true);  // printToStdOut==true
 
    cout << "Finished IWB testing!" << endl;
    cout << "****************************************";
@@ -522,12 +522,12 @@ void runTimingTests(void)
 
    cout << "\tNow allocate a 4096x4096 images and move them around:" << endl;
    gpuStartTimer();
-   cudaImageDevice deviceBigImg(4096,4096);
+   cudaImageDevice<int> deviceBigImg(4096,4096);
    gputime = gpuStopTimer();
    printf("\t\tAllocating 64MB in device memory took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
 
    cpuStartTimer();
-   cudaImageHost hostBigImg(4096,4096);
+   cudaImageHost<int> hostBigImg(4096,4096);
    cputime = cpuStopTimer();
 
    gpuStartTimer();
@@ -540,7 +540,7 @@ void runTimingTests(void)
    gputime = gpuStopTimer();
    printf("\t\tCopying 64MB from DEVICE to HOST took %0.2f ms (%.0f MB/s)\n", gputime, 64000.0f/gputime);
 
-   cudaImageDevice copyOfBigImg(4096, 4096);
+   cudaImageDevice<int> copyOfBigImg(4096, 4096);
    gpuStartTimer();
    deviceBigImg.copyToDevice(copyOfBigImg);
    gputime = gpuStopTimer();
@@ -550,7 +550,7 @@ void runTimingTests(void)
    // We previously timed the host allocation but didn't report it
    printf("\t\tAllocating 64MB in HOST memory took %0.2f ms (%.0f MB/s)\n", cputime, 64000.0f/cputime);
 
-   cudaImageHost moreHostData(4096,4096);
+   cudaImageHost<int> moreHostData(4096,4096);
    cpuStartTimer();
    moreHostData = hostBigImg;
    cputime = cpuStopTimer();
@@ -568,7 +568,7 @@ void runTimingTests(void)
    cout << "***Timing a variety of morphological median calculations..." << endl;
    int NITER=10;
 
-   vector<cudaImageDevice> circ(8);
+   vector<cudaImageDevice<int> > circ(8);
    circ[0].copyFromHost(createBinaryCircle(3));
    circ[1].copyFromHost(createBinaryCircle(5));
    circ[2].copyFromHost(createBinaryCircle(7));
@@ -587,11 +587,11 @@ void runTimingTests(void)
       dim3 BLOCK(8, 32, 1);
       dim3 GRID(size/BLOCK.x, size/BLOCK.y, 1);
 
-      cudaImageHost   imgHost(size,size);
-      cudaImageDevice imgDeviceIn(size,size);
-      cudaImageDevice imgDeviceOut(size,size);
-      cudaImageDevice imgTemp1(size,size);
-      cudaImageDevice imgTemp2(size,size);
+      cudaImageHost<int>   imgHost(size,size);
+      cudaImageDevice<int> imgDeviceIn(size,size);
+      cudaImageDevice<int> imgDeviceOut(size,size);
+      cudaImageDevice<int> imgTemp1(size,size);
+      cudaImageDevice<int> imgTemp2(size,size);
 
       // Put some data in the host image for fun
       for(int i=0; i<size*size; i++)
@@ -716,10 +716,10 @@ void runTimingTests(void)
    int seDiam = 7;
    dim3 BLOCK;
    dim3 GRID;
-   cudaImageHost   imgHost(size,size);
-   cudaImageDevice in1024(size,size);
-   cudaImageDevice out1024(size,size);
-   cudaImageDevice se7(createBinaryCircle(seDiam));
+   cudaImageHost<int>   imgHost(size,size);
+   cudaImageDevice<int> in1024(size,size);
+   cudaImageDevice<int> out1024(size,size);
+   cudaImageDevice<int> se7(createBinaryCircle(seDiam));
 
 
    vector<dim3> BLOCKvect(0);
@@ -762,7 +762,7 @@ void runTimingTests(void)
    for(int test=1; test<5; test+=2)
    {
       int size = testSizes[test];
-      cudaImageHost   imgHost(size,size);
+      cudaImageHost<int>   imgHost(size,size);
       for(int i=0; i<size*size; i++)
          imgHost[i] = i%2;
 
@@ -809,7 +809,7 @@ void runTimingTests(void)
       cout << endl;    
    }
    cout << endl << endl;
-   cudaImageDevice::calculateDeviceMemoryUsage(true);
+   cudaImageDevice<int>::calculateDeviceMemoryUsage(true);
 
 
 }
